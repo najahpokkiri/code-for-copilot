@@ -1304,6 +1304,7 @@ class EnhancedModelTrainer:
                 model = model_class(n_features).to(self.device)
                 criterion = get_loss_function(loss_name)
                 
+                
                 optimizer = optim.AdamW(
                     model.parameters(),
                     lr=self.config.learning_rate,
@@ -2180,10 +2181,6 @@ def analyze_enhanced_results(df_results, site_df, config):
         print(f"   → Consider increasing temporal features to 'complete'")
 
 # Run enhanced final analysis
-# run with test mode
-
-
-config = EnhancedBenchmarkConfig(mode='test')
 analyze_enhanced_results(df_results, site_df, config)
 
 # # Step 21: Save Enhanced Results
