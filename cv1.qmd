@@ -1,0 +1,180 @@
+---
+format:
+  pdf:
+    pdf-engine: pdflatex
+    include-in-header: header.tex
+    geometry: margin=1.5cm
+    fontsize: 10pt
+    keep-tex: true
+block-headings: false
+mainfont: "Times New Roman"
+---
+\begin{center}
+{\LARGE\bfseries Abdul Najah} \\
+\vspace{0.5ex}
+\textit{Geospatial Data Scientist | EO Consultant | Technical Lead in Environmental AI}
+
+  \vspace{1ex}
+  Berlin, Germany
+
+  \vspace{1ex}
+  \hrule
+  \vspace{1.5ex}
+
+  \faEnvelope\ \href{mailto:abdulnajahp@gmail.com}{abdulnajahp@gmail.com} \quad
+  \faPhone\ +49\,155\,1027\,5727 \quad
+  \faGithub\ \href{https://github.com/najahpokkiri}{github.com/najahpokkiri} \quad
+  \faGlobe\ \href{https://abdulnajah.com}{abdulnajah.com}
+\end{center}
+
+
+# Employment
+
+## Geospatial Experience
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Senior Data Scientist (Technical Lead)} & \large\textbf{vertify.earth / Vertical 52} & \large\textit{June 2024 – Present} \\
+\textbf{Data Scientist} & & \textit{Oct 2023 – May 2024} \\
+\end{tabular*}
+
+Led the development of applied machine learning pipelines for environmental monitoring and satellite-based media intelligence. Served as the technical focal point across teams, guiding EO product design, mentoring analysts, and deploying reproducible workflows at scale.
+
+**Leadership & Consulting**
+
+- Acted as primary technical consultant across interdisciplinary teams, advising on geospatial ML, satellite data integration, and reproducibility
+- Guided organizational shift from GUI-based workflows (**GEE**, **ArcGIS**) to scalable, automated pipelines in **Python**
+- Designed cloud infrastructure for EO delivery on **AWS**, with prototyping on **Google Cloud**, and standardized **STAC/COG** adoption 
+- Mentored junior analysts and non-technical users (e.g. exiled journalists) in reproducible pipelines and satellite-based conflict monitoring
+- Represented the organization at high-level international events including **COP28 (Dubai)**, **SatSummit (Lisbon)**, **ESA EO Workshop (Rome)**, and **GeoMob (Berlin)**
+  
+**Flagship Projects**
+
+- **Biomass Estimation via Deep Learning Ensemble:**  
+  Developed a custom deep learning ensemble to estimate forest biomass and carbon sinks in India using multi-sensor EO data. Constructed training datasets from **airborne LiDAR** and **ISRO ground-truth**. Achieved **R² = 0.87** and **MAE = 18**, enabling early-stage public tool prototypes.
+
+- **Impervious Surface Detection (Computer Vision):**  
+  Designed and deployed ML pipelines to detect impervious surfaces across German cities using RGBI (50cm), PlanetScope, and Sentinel-2 imagery. Integrated preprocessing, classification, and validation stages for scalable, city-level mapping products.
+
+- **Soil Organic Carbon (SOC) Prediction:**  
+  Built machine learning models to estimate SOC for climate and restoration projects in India (GIZ India) and Germany (EU LUCAS dataset), using EO predictors (Sentinel-2, DEMs, climate layers) and partner-provided ground truth. Hosted reproducible outputs on **GitHub** and **Hugging Face**.
+
+**Additional Contributions**
+
+- Created operational **SAR-based damage proxy maps** for humanitarian response in Gaza, Ukraine, and Turkey (2023 earthquake), combining coherence change analysis, infrastructure overlays, and rapid event timelines 
+- Produced **flood impact assessments** for the Rhine River overflow in Germany, using Sentinel-1 time-series analysis and terrain-aware flood delineation
+- Developed workflows to estimate **affected infrastructure and critical assets** (buildings, hospitals, roads) by integrating **OpenStreetMap**, **Microsoft**, and **Google building footprints** with geospatial damage layers
+- Delivered high-quality EO outputs and maps used by journalists, humanitarian analysts, and partner organizations — see highlights in [Media Contributions](https://abdulnajah.com/posts/media-contributions/)
+- Validated results through multi-source overlays and remote verification techniques, ensuring defensibility for both public reporting and internal review
+
+**Tools & Stack**  : Python, R, QGIS, Google Earth Engine, PyTorch, Hugging Face, Git, STAC, COG, AWS
+\newpage
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Research Assistant } & \large\textbf{Centre for Climate Change \& Sustainability} & \large\textit{May – Oct 2023} \\
+\end{tabular*}
+- Worked with Prof. Meghna Agarwala (Ph.D., Columbia University) on remote sensing and **wildfire detection** in central India.
+- Developed a machine learning pipeline to detect burned area from **wildfires and agricultural fires** using Sentinel and MODIS data.
+- Created training datasets, engineered spectral indices, and tuned ML models for **burned area classification**.
+- Co‑authored a peer‑reviewed publication in *Frontiers in Forests and Global Change*: 
+  *"Evaluating Methods to Map **Burned Area** at 30‑Meter Resolution in Forests and Agricultural Areas of Central India."*
+
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Research Assistant } & \large\textbf{ Ashoka University} & \large\textit{Oct - Dec 2023} \\
+\end{tabular*}
+- Collaborated with Prof. Anustubh Agnihotri (Ph.D., University of California, Berkeley) on spatial metrics for **urban growth** and fiscal policy analysis. 
+- Built **urban expansion metrics** for Indian municipalities using **built-up detection** and proxy data sources.
+- Compared Google Dynamic World, VIIRS night lights, and ESRI WorldCover datasets. 
+- Deployed Random Forest and SVM classifiers for time‑series analysis.
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{GIS Data Science Intern} & \large\textbf{Gramener, Hyderabad} & \large\textit{May – June 2022} \\
+\end{tabular*}
+- Conducted spatial analysis on over **1 million consumer records** for a Fortune 100 U.S. company.
+- Applied Exploratory Spatial Data Analysis (ESDA) to investigate **regional purchasing trends** tied to store location and revenue.
+- Delivered geospatial insights used for **business strategy refinement**.
+
+
+## Leadership, Teaching & Capacity Building
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Teaching Assistant} & \large\textbf{AshokaX (Online, funded by data.org)} & \large\textit{2023–2025} \\
+\end{tabular*}
+
+- Supported two professional cohorts for the course **Data Science for Social Impact**, focused on applying data science to **climate**, **public health**, and **development challenges**.
+- Led **weekly live discussion sessions** and mentored participants on **project development**.
+- Worked with instructors from **leading global institutions** and contributed to **curriculum delivery** and **logistics**.
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Teaching Fellow} & \large\textbf{Ashoka University, India} & \large\textit{Jan – May 2023} \\
+\end{tabular*}
+
+- Taught the undergraduate course **Data Science for Social Science** to ~80 students from **political science** and **economics** in **Asia’s #1 economics department** (Ashoka University).
+- Delivered **weekly lab and discussion sessions** on **statistics**, **R programming**, and **data engineering workflows**.
+- Held **5+ hours/week** of office hours and received a **4.5/5 student rating** for **teaching effectiveness**.
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Teaching Assistant} & \large\textbf{Ashoka University (Prof. Meghna Agarwala)} & \large\textit{2022} \\
+\end{tabular*}
+- Supported delivery of an undergraduate course focused on **environmental GIS** and **remote sensing**.
+- Provided technical assistance, office hours, and logistical coordination for a diverse cohort of students.
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Research Associate} & \large\textbf{Centre for Policy Research (CPR)} & \large\textit{June 2020 – Dec 2021} \\
+\end{tabular*}
+- Worked under the mentorship of Dr. Rahul Verma (Fellow, CPR) on multiple academic research projects focusing on **Indian elections**, **political behavior**, and **public policy**.
+- Designed and implemented robust data science workflows using R, combining statistical modeling, spatial analysis, and web scraping (PDF + HTML) across diverse datasets.
+- Conducted advanced analyses including logistic regression, survival models, and spatial autocorrelation (Moran's I) to study **voting trends** and **demographic patterns**.
+- Maintained reproducibility and transparency through use of Git, R Markdown, and custom documentation protocols.
+- Supported **publication-quality research** outputs and collaborated closely with academic co-authors across institutions.
+- Project funded by **Rosa Luxemburg Stiftung – South Asia**.
+
+# **Projects**
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r}
+\textbf{Burned Area Prediction using Landsat 5 and Machine Learning} & \href{https://github.com/najahpokkiri/burned-area-prediction-landsat5}{View on GitHub} \\
+\end{tabular*}
+End-to-end pipeline to classify **burned areas** using satellite imagery and ML in Python.
+
+\vspace{-0.2em}
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r}
+\textbf{Compare Spectra App} & \href{https://najahpokkiri.com/posts/compare-spectra/}{View Project} \\
+\end{tabular*}
+Google Earth Engine–based tool for exploring and comparing **spectral signatures** interactively.
+
+# **Certifications**
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l r}
+Beyond the Visible: Introduction to \textbf{Hyperspectral Remote Sensing} & EO College \\
+\textbf{Crop Mapping} using SAR \& Optical Remote Sensing & NASA ARSET \\
+Earth Observations for \textbf{Humanitarian Applications} & NASA ARSET \\
+ENVI Analytics & Esri India \\
+\end{tabular*}
+
+# **Education**
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{M.Sc. Geodesy and Geoinformation} & \large\textbf{Technische Universität Berlin} & \large\textit{2024 – Present} \\
+\end{tabular*}
+- Specialisation in **Computer Vision**
+- Coursework includes: **Automated Image Processing**, **Photogrammetric Computer Vision**, **Geodatabases**, **Geoinformation Science**, **Microwave and Radar Remote Sensing**, and **Image Processing for Earth Observation**
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{B.A. (Hons.) Political Science} & \large\textbf{Ashoka University, India} & \large\textit{2017 – 2020} \\
+\end{tabular*}
+
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l c r}
+\large\textbf{Postgraduate Diploma in Advanced Research (DipSAR)} & & \large\textit{2022 – 2022} \\
+\end{tabular*}
+
+- Received a rigorous liberal arts education with a **major in Political Science** and **minors in Sociology and Environmental Studies**, blending disciplinary depth with interdisciplinary range
+- Developed strong foundations in **critical thinking**, **academic writing**, and **research design**, guided by Ashoka’s emphasis on connecting theory to real-world application
+- Focused on **computational and quantitative social science**, with coursework and research spanning **economics**, **empirical political economy**, and **spatial data analysis**
+- Gained technical proficiency in **quantitative methods**, **statistical programming**, and **reproducible research workflows**, alongside broad-based exposure to social and environmental issues
+- Studied at one of Asia’s most selective universities, known for its **research-intensive pedagogy**, **world-class faculty**, and **leading economics and political science departments**
+  
+# **Publications**
+
+- **Evaluating methods to map burned area at 30-meter resolution in forests and agricultural areas of Central India**  
+  *Frontiers in Forests and Global Change* – with Chandel, Sarwat, Najah, Dhanagare & Agarwala (2022)
