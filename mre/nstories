@@ -1,0 +1,623 @@
+import os
+import pandas as pd
+import numpy as np
+import rasterio
+from rasterio.windows import from_bounds
+from rasterio.features import geometry_mask
+import requests
+import zipfile
+from pathlib import Path
+from shapely.geometry import box
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+import multiprocessing as mp
+import psutil
+import time
+from datetime import datetime
+import warnings
+import traceback
+from functools import partial
+warnings.filterwarnings('ignore')
+
+class ParallelJRCProcessor:
+    """
+    Production-ready parallel JRC raster aggregation using on-the-go grid calculations
+    Optimized for Databricks environment based on benchmark results
+    """
+    
+    def __init__(self, grid_csv_path, output_dir="data/outputs"):
+        self.grid_csv_path = grid_csv_path
+        self.output_dir = output_dir
+        self.tiles_dir = "data/tiles"
+        
+        # System capabilities
+        self.cpu_count = psutil.cpu_count(logical=False)
+        self.cpu_logical = psutil.cpu_count(logical=True)
+        self.memory_gb = psutil.virtual_memory().total / (1024**3)
+        
+        # Optimal worker count based on benchmarks (on-the-fly is more efficient)
+        self.max_workers = min(8, max(1, self.cpu_logical - 1))
+        
+        print(f"🔧 SYSTEM CONFIGURATION")
+        print(f"   💻 CPU: {self.cpu_count} physical, {self.cpu_logical} logical cores")
+        print(f"   🧠 Memory: {self.memory_gb:.1f} GB")
+        print(f"   ⚡ Workers: {self.max_workers} (optimized for on-the-go processing)")
+        
+        self.setup_directories()
+        self.load_grid_data()
+        
+        # JRC dataset configurations
+        self.jrc_configs = {
+            'built_c': {
+                'base_url': "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_C_GLOBE_R2023A/GHS_BUILT_C_MSZ_E2018_GLOBE_R2023A_54009_10/V1-0/tiles/",
+                'filename_template': "GHS_BUILT_C_MSZ_E2018_GLOBE_R2023A_54009_10_V1_0_{tile_id}.zip",
+                'description': 'Built-up areas and building heights'
+            },
+            'smod': {
+                'base_url': "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_SMOD_GLOBE_R2023A/GHS_SMOD_E2020_GLOBE_R2023A_54009_1000/V2-0/tiles/",
+                'filename_template': "GHS_SMOD_E2020_GLOBE_R2023A_54009_1000_V2_0_{tile_id}.zip",
+                'description': 'Settlement model and urbanization levels'
+            }
+        }
+        
+        # Classification mappings
+        self.built_height_mapping = {
+            1: "MSZ, open spaces, low vegetation", 2: "MSZ, open spaces, medium vegetation", 
+            3: "MSZ, open spaces, high vegetation", 4: "MSZ, open spaces, water surfaces",
+            5: "MSZ, open spaces, road surfaces", 11: "MSZ, residential, height <= 3m",
+            12: "MSZ, residential, 3m < height <= 6m", 13: "MSZ, residential, 6m < height <= 15m",
+            14: "MSZ, residential, 15m < height <= 30m", 15: "MSZ, residential, height > 30m",
+            21: "MSZ, non-residential, height <= 3m", 22: "MSZ, non-residential, 3m < height <= 6m",
+            23: "MSZ, non-residential, 6m < height <= 15m", 24: "MSZ, non-residential, 15m < height <= 30m",
+            25: "MSZ, non-residential, height > 30m", 0: "Non-built-up", 255: "NoData"
+        }
+        
+        self.smod_mapping = {
+            30: "URBAN CENTRE", 23: "DENSE URBAN CLUSTER", 22: "SEMI-DENSE URBAN CLUSTER",
+            21: "SUBURBAN OR PERI-URBAN", 13: "RURAL CLUSTER", 12: "LOW DENSITY RURAL",
+            11: "VERY LOW DENSITY RURAL", 10: "WATER", 0: "Non-built-up", 255: "NoData"
+        }
+
+    def setup_directories(self):
+        """Create required directories"""
+        directories = [self.output_dir, self.tiles_dir, 
+                      f"{self.tiles_dir}/built_c", f"{self.tiles_dir}/smod"]
+        for directory in directories:
+            os.makedirs(directory, exist_ok=True)
+
+    def load_grid_data(self):
+        """Load grid data - only centroids needed for on-the-go processing"""
+        print(f"\n📊 Loading grid data from: {self.grid_csv_path}")
+        
+        try:
+            self.grid_df = pd.read_csv(self.grid_csv_path)
+            print(f"   ✅ Loaded {len(self.grid_df):,} grid cells")
+            
+            # Required columns for on-the-go processing
+            required_cols = ['tile_id', 'grid_id', 'centroid_x', 'centroid_y']
+            missing_cols = [col for col in required_cols if col not in self.grid_df.columns]
+            
+            if missing_cols:
+                raise ValueError(f"Missing required columns: {missing_cols}")
+            
+            # Get tiles
+            self.available_tiles = sorted(self.grid_df['tile_id'].unique())
+            print(f"   🗺️ Available tiles: {len(self.available_tiles)}")
+            print(f"   📋 Sample tiles: {self.available_tiles[:5]}{'...' if len(self.available_tiles) > 5 else ''}")
+            
+        except Exception as e:
+            raise ValueError(f"Failed to load grid data: {e}")
+
+    def download_jrc_tile(self, tile_id, dataset_type):
+        """Download JRC tile if not exists"""
+        config = self.jrc_configs[dataset_type]
+        filename = config['filename_template'].format(tile_id=tile_id)
+        url = config['base_url'] + filename
+        
+        extract_dir = os.path.join(self.tiles_dir, dataset_type, tile_id)
+        zip_path = os.path.join(self.tiles_dir, f"{tile_id}_{dataset_type}.zip")
+        
+        # Check if already exists
+        if os.path.exists(extract_dir):
+            tif_files = list(Path(extract_dir).glob("*.tif"))
+            if tif_files:
+                return tif_files[0]
+        
+        print(f"    📥 Downloading {dataset_type.upper()} tile {tile_id}...")
+        
+        try:
+            response = requests.get(url, stream=True, timeout=300)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
+            
+            with open(zip_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+            
+            print(f"      ✅ Downloaded {downloaded / (1024*1024):.1f} MB")
+            
+            # Extract
+            os.makedirs(extract_dir, exist_ok=True)
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            os.remove(zip_path)
+            
+            tif_files = list(Path(extract_dir).glob("*.tif"))
+            return tif_files[0] if tif_files else None
+            
+        except Exception as e:
+            print(f"      ❌ Download failed: {e}")
+            return None
+
+def process_grid_chunk_optimized(args):
+    """
+    Optimized worker function for parallel processing
+    Uses on-the-go grid calculation for maximum efficiency
+    """
+    grid_chunk, raster_path, dataset_type, cell_size, aggregations = args
+    
+    results = []
+    
+    try:
+        with rasterio.open(raster_path) as src:
+            half_size = cell_size / 2
+            
+            for _, grid_row in grid_chunk.iterrows():
+                try:
+                    # Calculate grid bounds on-the-go (faster according to benchmarks)
+                    cx, cy = grid_row['centroid_x'], grid_row['centroid_y']
+                    minx, miny = cx - half_size, cy - half_size
+                    maxx, maxy = cx + half_size, cy + half_size
+                    
+                    # Get window for this grid
+                    window = from_bounds(minx, miny, maxx, maxy, src.transform)
+                    
+                    # Read data within window
+                    data = src.read(1, window=window)
+                    
+                    # Filter valid data
+                    valid_data = data[(data != src.nodata) & (data != 255) & (~np.isnan(data))]
+                    
+                    grid_result = {
+                        'grid_id': grid_row['grid_id'],
+                        'tile_id': grid_row['tile_id'],
+                        'centroid_x': cx,
+                        'centroid_y': cy
+                    }
+                    
+                    if len(valid_data) > 0:
+                        # Calculate all requested aggregations
+                        for agg in aggregations:
+                            if agg == 'mean':
+                                grid_result[f'{dataset_type}_mean'] = np.mean(valid_data)
+                            elif agg == 'median':
+                                grid_result[f'{dataset_type}_median'] = np.median(valid_data)
+                            elif agg == 'max':
+                                grid_result[f'{dataset_type}_max'] = np.max(valid_data)
+                            elif agg == 'min':
+                                grid_result[f'{dataset_type}_min'] = np.min(valid_data)
+                            elif agg == 'std':
+                                grid_result[f'{dataset_type}_std'] = np.std(valid_data)
+                            elif agg == 'sum':
+                                grid_result[f'{dataset_type}_sum'] = np.sum(valid_data)
+                            elif agg == 'count':
+                                grid_result[f'{dataset_type}_count'] = len(valid_data)
+                            elif agg == 'dominant':
+                                # Most frequent value
+                                unique_vals, counts = np.unique(valid_data, return_counts=True)
+                                dominant_idx = np.argmax(counts)
+                                grid_result[f'{dataset_type}_dominant'] = int(unique_vals[dominant_idx])
+                                grid_result[f'{dataset_type}_dominant_pct'] = (counts[dominant_idx] / len(valid_data)) * 100
+                        
+                        # Always include pixel count and coverage
+                        grid_result[f'{dataset_type}_pixel_count'] = len(valid_data)
+                        grid_result[f'{dataset_type}_coverage'] = (len(valid_data) / (data.size)) * 100
+                        
+                    else:
+                        # No valid data
+                        for agg in aggregations:
+                            grid_result[f'{dataset_type}_{agg}'] = np.nan
+                        grid_result[f'{dataset_type}_pixel_count'] = 0
+                        grid_result[f'{dataset_type}_coverage'] = 0
+                    
+                    results.append(grid_result)
+                    
+                except Exception as e:
+                    # Error in individual grid
+                    error_result = {
+                        'grid_id': grid_row['grid_id'],
+                        'tile_id': grid_row['tile_id'],
+                        'centroid_x': grid_row['centroid_x'],
+                        'centroid_y': grid_row['centroid_y']
+                    }
+                    for agg in aggregations:
+                        error_result[f'{dataset_type}_{agg}'] = np.nan
+                    error_result[f'{dataset_type}_pixel_count'] = 0
+                    error_result[f'{dataset_type}_coverage'] = 0
+                    results.append(error_result)
+    
+    except Exception as e:
+        print(f"❌ Worker error: {e}")
+        return []
+    
+    return results
+
+class ParallelJRCProcessor:
+    """Main processor class"""
+    
+    def __init__(self, grid_csv_path, output_dir="data/outputs"):
+        self.grid_csv_path = grid_csv_path
+        self.output_dir = output_dir
+        self.tiles_dir = "data/tiles"
+        
+        # System capabilities
+        self.cpu_count = psutil.cpu_count(logical=False)
+        self.cpu_logical = psutil.cpu_count(logical=True)
+        self.memory_gb = psutil.virtual_memory().total / (1024**3)
+        self.max_workers = min(8, max(1, self.cpu_logical - 1))
+        
+        print(f"🔧 SYSTEM CONFIGURATION")
+        print(f"   💻 CPU: {self.cpu_count} physical, {self.cpu_logical} logical cores")
+        print(f"   🧠 Memory: {self.memory_gb:.1f} GB")
+        print(f"   ⚡ Workers: {self.max_workers}")
+        
+        self.setup_directories()
+        self.load_grid_data()
+        
+        # JRC configurations
+        self.jrc_configs = {
+            'built_c': {
+                'base_url': "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_C_GLOBE_R2023A/GHS_BUILT_C_MSZ_E2018_GLOBE_R2023A_54009_10/V1-0/tiles/",
+                'filename_template': "GHS_BUILT_C_MSZ_E2018_GLOBE_R2023A_54009_10_V1_0_{tile_id}.zip"
+            },
+            'smod': {
+                'base_url': "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_SMOD_GLOBE_R2023A/GHS_SMOD_E2020_GLOBE_R2023A_54009_1000/V2-0/tiles/",
+                'filename_template': "GHS_SMOD_E2020_GLOBE_R2023A_54009_1000_V2_0_{tile_id}.zip"
+            }
+        }
+
+    def setup_directories(self):
+        """Create required directories"""
+        directories = [self.output_dir, self.tiles_dir, 
+                      f"{self.tiles_dir}/built_c", f"{self.tiles_dir}/smod"]
+        for directory in directories:
+            os.makedirs(directory, exist_ok=True)
+
+    def load_grid_data(self):
+        """Load grid data"""
+        print(f"\n📊 Loading grid data from: {self.grid_csv_path}")
+        
+        self.grid_df = pd.read_csv(self.grid_csv_path)
+        print(f"   ✅ Loaded {len(self.grid_df):,} grid cells")
+        
+        self.available_tiles = sorted(self.grid_df['tile_id'].unique())
+        print(f"   🗺️ Available tiles: {len(self.available_tiles)}")
+
+    def download_jrc_tile(self, tile_id, dataset_type):
+        """Download JRC tile if not exists"""
+        config = self.jrc_configs[dataset_type]
+        filename = config['filename_template'].format(tile_id=tile_id)
+        url = config['base_url'] + filename
+        
+        extract_dir = os.path.join(self.tiles_dir, dataset_type, tile_id)
+        zip_path = os.path.join(self.tiles_dir, f"{tile_id}_{dataset_type}.zip")
+        
+        # Check if already exists
+        if os.path.exists(extract_dir):
+            tif_files = list(Path(extract_dir).glob("*.tif"))
+            if tif_files:
+                return tif_files[0]
+        
+        print(f"    📥 Downloading {dataset_type.upper()} tile {tile_id}...")
+        
+        try:
+            response = requests.get(url, stream=True, timeout=300)
+            response.raise_for_status()
+            
+            with open(zip_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            os.makedirs(extract_dir, exist_ok=True)
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            os.remove(zip_path)
+            
+            tif_files = list(Path(extract_dir).glob("*.tif"))
+            return tif_files[0] if tif_files else None
+            
+        except Exception as e:
+            print(f"      ❌ Download failed: {e}")
+            return None
+
+    def process_tile_parallel(self, tile_id, datasets=['built_c'], aggregations=['mean', 'max', 'dominant'], 
+                            cell_size=5000, chunk_size=250):
+        """
+        Process a single tile using parallel workers
+        """
+        print(f"\n🎯 Processing Tile: {tile_id}")
+        
+        # Get grids for this tile
+        tile_grids = self.grid_df[self.grid_df['tile_id'] == tile_id].copy()
+        
+        if len(tile_grids) == 0:
+            print(f"  ⚠️ No grids found for tile {tile_id}")
+            return None
+        
+        print(f"  📊 {len(tile_grids):,} grids to process")
+        
+        tile_results = []
+        
+        for dataset in datasets:
+            print(f"  🗂️ Processing {dataset.upper()} dataset...")
+            
+            # Download raster
+            raster_path = self.download_jrc_tile(tile_id, dataset)
+            if not raster_path:
+                print(f"    ❌ Failed to download {dataset}")
+                continue
+            
+            print(f"    ✅ Raster available: {raster_path.name}")
+            
+            # Split grids into chunks for parallel processing
+            chunks = [tile_grids[i:i + chunk_size] for i in range(0, len(tile_grids), chunk_size)]
+            print(f"    📦 Split into {len(chunks)} chunks of ~{chunk_size} grids each")
+            
+            # Prepare arguments for workers
+            worker_args = [
+                (chunk, str(raster_path), dataset, cell_size, aggregations) 
+                for chunk in chunks
+            ]
+            
+            # Process chunks in parallel
+            start_time = time.time()
+            
+            with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+                # Submit all chunks
+                future_to_chunk = {
+                    executor.submit(process_grid_chunk_optimized, args): i 
+                    for i, args in enumerate(worker_args)
+                }
+                
+                dataset_results = []
+                completed_chunks = 0
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_chunk):
+                    chunk_idx = future_to_chunk[future]
+                    try:
+                        chunk_results = future.result()
+                        dataset_results.extend(chunk_results)
+                        completed_chunks += 1
+                        
+                        # Progress update
+                        progress = (completed_chunks / len(chunks)) * 100
+                        print(f"      📈 Progress: {completed_chunks}/{len(chunks)} chunks ({progress:.1f}%)")
+                        
+                    except Exception as e:
+                        print(f"      ❌ Chunk {chunk_idx} failed: {e}")
+            
+            processing_time = time.time() - start_time
+            
+            # Verify results
+            valid_results = [r for r in dataset_results if f'{dataset}_pixel_count' in r and r[f'{dataset}_pixel_count'] > 0]
+            success_rate = (len(valid_results) / len(tile_grids)) * 100
+            
+            print(f"    ⏱️ Processing time: {processing_time:.1f}s")
+            print(f"    ✅ Success rate: {len(valid_results):,}/{len(tile_grids):,} ({success_rate:.1f}%)")
+            print(f"    🚀 Speed: {len(tile_grids)/processing_time:.1f} grids/second")
+            
+            tile_results.extend(dataset_results)
+        
+        # Convert to DataFrame and merge all datasets
+        if tile_results:
+            # Group results by grid_id to merge multiple datasets
+            grid_results = {}
+            
+            for result in tile_results:
+                grid_id = result['grid_id']
+                if grid_id not in grid_results:
+                    grid_results[grid_id] = {
+                        'grid_id': grid_id,
+                        'tile_id': result['tile_id'],
+                        'centroid_x': result['centroid_x'],
+                        'centroid_y': result['centroid_y']
+                    }
+                
+                # Add dataset-specific columns
+                for key, value in result.items():
+                    if key not in ['grid_id', 'tile_id', 'centroid_x', 'centroid_y']:
+                        grid_results[grid_id][key] = value
+            
+            final_results = pd.DataFrame(list(grid_results.values()))
+            
+            print(f"  📊 Final results: {len(final_results):,} grids with {len(final_results.columns)} columns")
+            return final_results
+        
+        return None
+
+    def process_all_tiles(self, datasets=['built_c'], aggregations=['mean', 'max', 'dominant'], 
+                         cell_size=5000, save_individual=True):
+        """
+        Process all tiles sequentially (to manage memory) with parallel processing within each tile
+        """
+        print(f"\n🚀 STARTING PRODUCTION PROCESSING")
+        print(f"📊 Datasets: {datasets}")
+        print(f"🔢 Aggregations: {aggregations}")
+        print(f"📏 Cell size: {cell_size}m")
+        print(f"🗺️ Total tiles: {len(self.available_tiles)}")
+        print("=" * 80)
+        
+        start_time = time.time()
+        all_results = []
+        failed_tiles = []
+        
+        for i, tile_id in enumerate(self.available_tiles):
+            print(f"\n--- Tile {i+1}/{len(self.available_tiles)}: {tile_id} ---")
+            
+            try:
+                tile_result = self.process_tile_parallel(
+                    tile_id, datasets, aggregations, cell_size
+                )
+                
+                if tile_result is not None:
+                    all_results.append(tile_result)
+                    
+                    # Save individual tile results
+                    if save_individual:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        tile_file = os.path.join(self.output_dir, f"tile_{tile_id}_results_{timestamp}.csv")
+                        tile_result.to_csv(tile_file, index=False)
+                        print(f"  💾 Saved tile results: {tile_file}")
+                
+                else:
+                    failed_tiles.append(tile_id)
+                    print(f"  ❌ Tile {tile_id} processing failed")
+                
+            except Exception as e:
+                failed_tiles.append(tile_id)
+                print(f"  ❌ Tile {tile_id} error: {e}")
+                traceback.print_exc()
+        
+        # Combine all results
+        total_time = time.time() - start_time
+        
+        if all_results:
+            print(f"\n📊 Combining results from {len(all_results)} tiles...")
+            
+            combined_results = pd.concat(all_results, ignore_index=True)
+            
+            # Add classification descriptions
+            for dataset in datasets:
+                if f'{dataset}_dominant' in combined_results.columns:
+                    if dataset == 'built_c':
+                        built_mapping = {
+                            11: "Residential ≤3m", 12: "Residential 3-6m", 13: "Residential 6-15m",
+                            14: "Residential 15-30m", 15: "Residential >30m", 21: "Non-residential ≤3m",
+                            22: "Non-residential 3-6m", 23: "Non-residential 6-15m", 
+                            24: "Non-residential 15-30m", 25: "Non-residential >30m",
+                            0: "Non-built", 255: "NoData"
+                        }
+                        combined_results[f'{dataset}_description'] = combined_results[f'{dataset}_dominant'].map(built_mapping).fillna("Other")
+                    
+                    elif dataset == 'smod':
+                        smod_mapping = {
+                            30: "Urban Centre", 23: "Dense Urban", 22: "Semi-Dense Urban",
+                            21: "Suburban", 13: "Rural Cluster", 12: "Low Density Rural",
+                            11: "Very Low Density Rural", 10: "Water", 0: "Non-built", 255: "NoData"
+                        }
+                        combined_results[f'{dataset}_description'] = combined_results[f'{dataset}_dominant'].map(smod_mapping).fillna("Other")
+            
+            # Save final results
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # CSV output
+            csv_file = os.path.join(self.output_dir, f"jrc_india_aggregated_{timestamp}.csv")
+            combined_results.to_csv(csv_file, index=False)
+            
+            # Summary statistics
+            total_grids = len(combined_results)
+            successful_tiles = len(all_results)
+            failed_count = len(failed_tiles)
+            
+            print(f"\n🎉 PROCESSING COMPLETE!")
+            print("=" * 50)
+            print(f"⏱️ Total time: {total_time:.1f} seconds ({total_time/60:.1f} minutes)")
+            print(f"📊 Total grids processed: {total_grids:,}")
+            print(f"🗺️ Successful tiles: {successful_tiles}/{len(self.available_tiles)} ({(successful_tiles/len(self.available_tiles))*100:.1f}%)")
+            print(f"❌ Failed tiles: {failed_count} - {failed_tiles[:3]}{'...' if len(failed_tiles) > 3 else ''}")
+            print(f"🚀 Processing speed: {total_grids/total_time:.1f} grids/second")
+            print(f"💾 Final results: {csv_file}")
+            
+            # Dataset-specific statistics
+            for dataset in datasets:
+                if f'{dataset}_pixel_count' in combined_results.columns:
+                    valid_grids = combined_results[f'{dataset}_pixel_count'].gt(0).sum()
+                    coverage = (valid_grids / total_grids) * 100
+                    print(f"📈 {dataset.upper()} coverage: {valid_grids:,} grids ({coverage:.1f}%)")
+                    
+                    if f'{dataset}_mean' in combined_results.columns:
+                        mean_value = combined_results[f'{dataset}_mean'].mean()
+                        print(f"📊 {dataset.upper()} average: {mean_value:.3f}")
+            
+            # Sample results
+            print(f"\n📋 Sample Results (first 5 grids):")
+            sample_cols = ['tile_id', 'grid_id', 'centroid_x', 'centroid_y']
+            for dataset in datasets:
+                for agg in ['mean', 'max', 'dominant']:
+                    col_name = f'{dataset}_{agg}'
+                    if col_name in combined_results.columns:
+                        sample_cols.append(col_name)
+            
+            available_cols = [col for col in sample_cols if col in combined_results.columns]
+            print(combined_results[available_cols].head().to_string(index=False))
+            
+            return combined_results
+        
+        else:
+            print(f"\n❌ No successful results from any tiles")
+            return None
+
+def main():
+    """Main execution function"""
+    
+    # Configuration - Update these paths for your environment
+    GRID_CSV_PATH = "india_5km_grids_complete_centroids_only.csv"  # Your centroids CSV
+    OUTPUT_DIR = "data/jrc_results"
+    
+    # Processing configuration
+    DATASETS = ['built_c']  # Add 'smod' if needed
+    AGGREGATIONS = ['mean', 'max', 'dominant', 'std']  # Choose aggregations you need
+    CELL_SIZE = 5000  # 5km grid size
+    
+    print("🌍 PARALLEL JRC RASTER AGGREGATION")
+    print("🚀 Optimized for on-the-go grid calculations")
+    print("=" * 60)
+    
+    # Check if grid file exists
+    if not os.path.exists(GRID_CSV_PATH):
+        print(f"❌ Grid CSV file not found: {GRID_CSV_PATH}")
+        print("Please ensure the grid CSV file exists or update the path")
+        return
+    
+    try:
+        # Initialize processor
+        processor = ParallelJRCProcessor(GRID_CSV_PATH, OUTPUT_DIR)
+        
+        # Show configuration
+        print(f"\n🎯 PROCESSING CONFIGURATION:")
+        print(f"   📁 Grid file: {GRID_CSV_PATH}")
+        print(f"   📊 Datasets: {DATASETS}")
+        print(f"   🔢 Aggregations: {AGGREGATIONS}")
+        print(f"   📏 Cell size: {CELL_SIZE}m")
+        print(f"   ⚡ Workers: {processor.max_workers}")
+        print(f"   💾 Output: {OUTPUT_DIR}")
+        
+        # Process all tiles
+        results = processor.process_all_tiles(
+            datasets=DATASETS,
+            aggregations=AGGREGATIONS,
+            cell_size=CELL_SIZE,
+            save_individual=True
+        )
+        
+        if results is not None:
+            print(f"\n✅ SUCCESS! Processed {len(results):,} grid cells")
+            print("Check the output directory for detailed results")
+        else:
+            print(f"\n❌ Processing failed - no results generated")
+            
+    except KeyboardInterrupt:
+        print(f"\n⚠️ Processing interrupted by user")
+    except Exception as e:
+        print(f"\n❌ Error during processing: {e}")
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    main()
