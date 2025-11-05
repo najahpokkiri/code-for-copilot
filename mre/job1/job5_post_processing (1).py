@@ -153,12 +153,12 @@ def filter_zero_buildings(df: DataFrame) -> DataFrame:
 
 def add_id_and_order(step2_df: DataFrame) -> DataFrame:
     df = step2_df
-    lat_int = (F.col("lat") * 1e6).cast("long")
-    lon_int = (F.col("lon") * 1e6).cast("long")
-    df = df.withColumn("ID", F.concat_ws("_", lat_int, lon_int))
+    # Create ID as lon_lat (longitude first, preserving minus signs)
+    df = df.withColumn("ID", F.concat_ws("_", F.col("lon").cast("string"), F.col("lat").cast("string")))
     df = df.withColumn("GRID_ID", F.col("ID"))
-    window_spec = Window.orderBy(F.col("ID"))
-    df = df.withColumn("order_id", F.row_number().over(window_spec))
+    # Sort by lon ascending, then lat ascending (2-layer sort)
+    window_spec = Window.orderBy(F.col("lon").asc(), F.col("lat").asc())
+    df = df.withColumn("ID_ORDER_XY", F.row_number().over(window_spec))
     return df
     
 def process_buildings_final(step2_df: DataFrame, props_df: DataFrame) -> DataFrame:
@@ -227,9 +227,9 @@ def process_buildings_final(step2_df: DataFrame, props_df: DataFrame) -> DataFra
     if "GRID_ID" not in result_df.columns and "ID" in result_df.columns:
         result_df = result_df.withColumn("GRID_ID", F.col("ID"))
     
-    select_cols = ["GRID_ID", "order_id", "lat", "lon", "urban"] + nr_cols + final_cols
+    select_cols = ["GRID_ID", "ID_ORDER_XY", "lat", "lon", "urban"] + nr_cols + final_cols
     select_cols = [c for c in select_cols if c in result_df.columns]
-    
+
     return result_df.select(*select_cols)
 
 def create_step4_df(step3_df: DataFrame, tsi_df: DataFrame) -> DataFrame:
@@ -446,7 +446,7 @@ def arrange_and_sum_columns(df):
     {"prefix": "storey", "suffix": "_IND_TSI", "sum_col": "IND_TSI_SUM"},
     {"prefix": "IND_Storey_", "suffix": "_tsi_perc", "sum_col": "IND_TSI_Perc_SUM"},
     ]
-    first_cols = ["GRID_ID", "order_id", "lat", "lon", "urban",
+    first_cols = ["GRID_ID", "ID_ORDER_XY", "lat", "lon", "urban",
                   "nr11_res", "nr12_res", "nr13_res", "nr14_res", "nr15_res",
                   "nr21_com", "nr21_ind", "nr22_com", "nr22_ind", "nr23_com", "nr23_ind",
                   "nr24_com", "nr24_ind", "nr25_com", "nr25_ind"]
