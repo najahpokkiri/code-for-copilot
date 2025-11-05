@@ -24,7 +24,7 @@ var CONFIG = {
   
   sampling: {
     enabled: true,
-    size: 100  // Process 100 grids
+    size: 50  // Process 50 grids - reduced from 600k dataset for performance
   },
   
   storeyHeight: 3.5, // meters per storey
@@ -162,9 +162,9 @@ function extractObservedStats(feature) {
       .combine(ee.Reducer.minMax(), '', true),
     geometry: geom,
     scale: 30,
-    maxPixels: 1e8,
+    maxPixels: 5e7,  // Reduced for performance
     bestEffort: true,
-    tileScale: 2
+    tileScale: 4  // Increased for better performance
   });
   
   // Extract with null protection
@@ -399,7 +399,7 @@ validCount.evaluate(function(count) {
     
     // Scatterplot
     var scatterChart = ui.Chart.feature.byFeature({
-      features: validGrids.limit(500),
+      features: validGrids.limit(50),  // Reduced for performance
       xProperty: 'obs_mean_height',
       yProperties: ['model_mean_height']
     })
