@@ -95,7 +95,7 @@ def export_full_table_to_csv(table_name, output_path, description):
         df = spark.table(table_name)
 
         # Drop VOID columns (not supported by CSV writer)
-        void_columns = [field.name for field in df.schema.fields if str(field.dataType).upper() == "VOIDTYPE"]
+        void_columns = [field.name for field in df.schema.fields if str(field.dataType).upper() == "VOIDTYPE()"]
         if void_columns:
             print(f"  Dropping VOID columns: {', '.join(void_columns)}")
             df = df.drop(*void_columns)
