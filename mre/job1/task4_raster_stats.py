@@ -1,25 +1,68 @@
-
-# os.environ["CONFIG_PATH"] = "./config.json"   # loader maps this to /dbfs/tmp/...
-
-#############################################
-## adding paralalisation
-
 #!/usr/bin/env python3
 """
-Job 4 (OPTIMIZED): Raster counts extraction with parallel tile processing
+Task 4 — Extract Raster Statistics from GHSL Tiles
+
+Extracts building counts from GHSL raster tiles at grid centroid locations.
+Uses parallel processing for optimal performance.
+
+Configuration:
+--------------
+Reads from config.json (generated from config.yaml via config_builder.py).
+All paths and table names are auto-generated from the YAML configuration.
+
+Required config keys:
+  - grid_source: Delta table with grid centroids
+  - built_root: Path to built_c tiles directory
+  - smod_root: Path to SMOD tiles directory (optional)
+  - counts_delta_table: Output Delta table for counts
+  - admin_path: Admin boundaries for masking
+  - tile_footprint_path: Tile footprint shapefile
+  - use_smod: Whether to include SMOD urban classification (default: True)
+  - chunk_size: Processing chunk size (default: 10000)
+  - max_workers: Thread pool size for chunk processing (default: 8)
+  - tile_parallelism: Number of tiles to process concurrently (default: 4)
+
+Usage:
+------
+  python task4_raster_stats.py --config_path config.json
+
+Or with CLI overrides:
+  python task4_raster_stats.py --config_path config.json --chunk_size 5000
+
+Output:
+-------
+  - Delta table: {catalog}.{schema}.grid_counts
+    Columns: grid_id, built, count, urban, lat, lon, tile_id
 
 OPTIMIZATIONS:
-- Processes 3 tiles concurrently using ThreadPoolExecutor at the tile level
-- Each tile still uses 8-worker threading for chunk processing (proven optimal)
-- All per-tile optimizations preserved (local staging, chunk_size=5000, windowed reads)
-- Expected speedup: 2.5-3x on 12-tile workloads
+--------------
+- Tile-level parallelism: Processes multiple tiles concurrently
+- Chunk-level parallelism: 8-worker threading within each tile
+- Local staging: Copies tiles to local disk for faster reads
+- Windowed reads: Memory-efficient raster access
+- Boundary masking: Filters points outside country boundaries
+- Expected speedup: 2.5-3x on typical workloads
 
-Changes from original:
-1. New `process_single_tile_wrapper()` function encapsulates full tile workflow
-2. Main loop wrapped in ThreadPoolExecutor(max_workers=3) for tile-level parallelism
-3. Added tile-level progress tracking
-4. Thread-safe output collection using list append (GIL-protected)
+Building Classification:
+------------------------
+  built_c raster values mapped to categories:
+    11-15: Residential (RES)
+    21-25: Commercial/Industrial (COM)
+
+SMOD Urban Classification:
+---------------------------
+  - 0: Rural
+  - 1: Urban
+  - 2: Suburban
+
+Notes:
+------
+  - Skips grid points outside country boundaries
+  - Uses Mollweide projection (ESRI:54009) for spatial operations
+  - Automatically handles missing SMOD data if use_smod=False
 """
+
+# os.environ["CONFIG_PATH"] = "./config.json"
 
 import sys
 import os

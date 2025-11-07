@@ -20,10 +20,81 @@ import re
 from typing import Dict, List, Optional
 
 from pyspark.sql import SparkSession
-os.environ["CONFIG_PATH"] = "./config.json"
-# Static settings
-BASE_INPUT_TABLE = "prp_mr_bdap_projects.geospatialsolutions.building_enrichment_output"
-BASE_OUTPUT_VIEW = "prp_mr_bdap_projects.geospatialsolutions.building_enrichment_tsi_proportions"
+
+# os.environ["CONFIG_PATH"] = "./config.json"
+
+# ================================================================================
+# CLI ARGUMENT PARSER
+# ================================================================================
+if len(sys.argv) > 1:
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            k = a.lstrip("-").upper()
+            v = ""
+            if (i + 1) < len(args) and not args[i + 1].startswith("--"):
+                v = args[i + 1]
+                i += 2
+            else:
+                i += 1
+            if v != "":
+                os.environ[k] = v
+        else:
+            i += 1
+
+# ================================================================================
+# CONFIG LOADER (reads from config.json)
+# ================================================================================
+DEFAULT_CONFIG = {
+    "catalog": "prp_mr_bdap_projects",
+    "schema": "geospatialsolutions",
+    "output_table": None,
+    "iso3": "IND"
+}
+
+def _read_json_path(path: str) -> dict:
+    if path.startswith("dbfs:"):
+        local = path.replace("dbfs:", "/dbfs", 1)
+    else:
+        local = path
+    with open(local, "r") as f:
+        return json.load(f)
+
+def load_config() -> dict:
+    cfg = dict(DEFAULT_CONFIG)
+    cfg_path = os.environ.get("CONFIG_PATH") or os.environ.get("CONFIG")
+    if cfg_path:
+        try:
+            loaded = _read_json_path(cfg_path)
+            cfg.update(loaded)
+        except Exception as e:
+            print(f"Warning: Could not load config from {cfg_path}: {e}")
+
+    # Override with env vars
+    for k in list(cfg.keys()):
+        env = os.environ.get(k.upper())
+        if env:
+            cfg[k] = env
+
+    return cfg
+
+# Load config
+cfg = load_config()
+CATALOG = cfg.get("catalog")
+SCHEMA = cfg.get("schema")
+ISO3 = cfg.get("iso3", "IND").strip().lower()
+
+# Derive table names from config (no hardcoding!)
+BASE_INPUT_TABLE = cfg.get("output_table")
+if not BASE_INPUT_TABLE:
+    # Fallback: construct from catalog/schema
+    BASE_INPUT_TABLE = f"{CATALOG}.{SCHEMA}.building_enrichment_output"
+
+# Output view base (without LOB suffix)
+BASE_OUTPUT_VIEW = f"{CATALOG}.{SCHEMA}.building_enrichment_tsi_proportions"
+
 LOBS = ["RES", "COM", "IND"]
 LEVEL_MAPPING = {
     "1": "1",
@@ -39,22 +110,6 @@ Y_COL_CANDIDATES = ["centroid_y","lat","POINT_Y","latitude"]
 ORDER_COL_CANDIDATES = ["order_id","ORDER_ID_XY","ID_ORDER_XY","orderid"]
 DROP_TABLE_IF_EXISTS = False
 FALLBACK_VIEW_SUFFIX = "_view"
-
-def get_iso3():
-    iso3 = None
-    cfg_path = os.environ.get("CONFIG_PATH") or os.environ.get("CONFIG")
-    if cfg_path:
-        if cfg_path.startswith("dbfs:"):
-            cfg_path = cfg_path.replace("dbfs:", "/dbfs", 1)
-        try:
-            with open(cfg_path, "r", encoding="utf8") as fh:
-                j = json.load(fh)
-            iso3 = j.get("iso3")
-        except Exception:
-            pass
-    if not iso3:
-        iso3 = os.environ.get("ISO3", "IND")
-    return iso3.strip().lower()
 
 def add_iso_suffix(name, iso3):
     if name is None:
@@ -192,7 +247,7 @@ def create_view_for_lob(spark, input_table, output_view_base, cols, lob, iso3):
 
 def main():
     try:
-        iso3 = get_iso3()
+        iso3 = ISO3  # Already loaded from config
         input_table = add_iso_suffix(BASE_INPUT_TABLE, iso3)
         output_view_base = add_iso_suffix(BASE_OUTPUT_VIEW, iso3)
         

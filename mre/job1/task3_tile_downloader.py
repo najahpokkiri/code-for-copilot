@@ -1,18 +1,47 @@
 #!/usr/bin/env python3
 """
-Job 3 — Download GHSL tiles (zip -> extract TIFFs)
+Task 3 — Download GHSL Tiles from JRC Repository
 
-Config-driven version (fixed for Spark Connect):
- - Pass a single config JSON via --config_path dbfs:/configs/job3_config.json
- - Or pass individual params as CLI pairs (--grid_source ... --tiles_dest_root ...); the CLI wrapper maps keys to UPPERCASE env vars.
- - Reads distinct tile_id values from a Delta table (GRID_SOURCE) without using .rdd (Spark Connect incompatible).
- - Computes GHSL URLs, downloads/extracts tiles into TILES_DEST_ROOT/{dataset}/{tile_id}/
- - Writes a download status Delta table DOWNLOAD_STATUS_TABLE.
+Downloads GHSL (Global Human Settlement Layer) raster tiles for grid cells
+generated in Task 2. Downloads zip files from JRC FTP, extracts TIFFs.
 
-Required config keys (if not provided via CLI/env):
-  - grid_source
-  - tiles_dest_root
-  - download_status_table
+Configuration:
+--------------
+Reads from config.json (generated from config.yaml via config_builder.py).
+All paths are auto-generated from the YAML configuration.
+
+Required config keys:
+  - grid_source: Delta table with grid centroids (contains tile_id column)
+  - tiles_dest_root: Root directory for downloaded tiles
+  - download_status_table: Delta table to track download status
+  - datasets: Comma-separated datasets to download (e.g., "built_c,smod")
+  - download_concurrency: Number of parallel downloads (default: 3)
+  - download_retries: Number of retry attempts (default: 2)
+
+Usage:
+------
+  python task3_tile_downloader.py --config_path config.json
+
+Or with CLI overrides:
+  python task3_tile_downloader.py --config_path config.json --dry_run True
+
+Output:
+-------
+  - Downloaded tiles: {tiles_dest_root}/built_c/{tile_id}/*.tif
+  - Downloaded tiles: {tiles_dest_root}/smod/{tile_id}/*.tif
+  - Delta table: {catalog}.{schema}.download_status (tracks success/failure)
+
+Datasets:
+---------
+  - built_c: Building construction layer (10m resolution)
+  - smod: Settlement model layer (1km resolution)
+
+Notes:
+------
+  - Uses concurrent ThreadPoolExecutor for parallel downloads
+  - Automatically retries failed downloads
+  - Verifies extracted files exist
+  - Compatible with Spark Connect (no .rdd usage)
 """
 import sys
 import os

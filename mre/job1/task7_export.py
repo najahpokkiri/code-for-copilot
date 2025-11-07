@@ -1,55 +1,147 @@
-# os.environ["CONFIG_PATH"] = "./config.json"
 #!/usr/bin/env python3
-
 """
-Export Building Enrichment FULL Datasets + Excel Summary
-Overwriting version (keeps only one export per country)
+Task 7 — Export Building Enrichment Datasets + Excel Summary
+
+Exports full datasets as CSV files and generates Excel summary by country.
+
+Configuration:
+--------------
+Reads from config.json (generated from config.yaml via config_builder.py).
+Export paths are auto-derived from output_dir in config.
+
+Required config keys:
+  - output_dir: Base output directory (exports go to {output_dir}/exports/)
+  - output_table: Input table with building enrichment output
+  - catalog: Databricks catalog
+  - schema: Databricks schema
+  - iso3: Country ISO3 code
+
+Usage:
+------
+  python task7_export.py --config_path config.json
+
+Or with overrides:
+  python task7_export.py --config_path config.json --iso3 USA
+
+Output:
+-------
+Exports to {output_dir}/exports/FULL_{ISO3}/:
+  - building_enrichment_output_{ISO3}_FULL.csv
+  - building_enrichment_tsi_proportions_{ISO3}_RES_FULL.csv
+  - building_enrichment_tsi_proportions_{ISO3}_COM_FULL.csv
+  - building_enrichment_tsi_proportions_{ISO3}_IND_FULL.csv
+
+Excel summary: {output_dir}/exports/building_summary_country_layout_{ISO3}.xlsx
+
+Features:
+---------
+  - Overwrites previous exports (keeps only latest per country)
+  - Handles large datasets via Spark/Pandas fallback
+  - Cleans incompatible column types for CSV export
+  - Generates country-level summary Excel with RES/COM/IND breakdowns
 """
 
 import os
 import sys
+import json
 import shutil
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
 from pyspark.sql import SparkSession
 from pyspark.sql.types import NullType
-os.environ["CONFIG_PATH"] = "./config.json"
-# ---------------------------------------------------------------------
-# ARGUMENT PARSER
-# ---------------------------------------------------------------------
-def parse_args():
-    args = {"iso3": "IND"}
-    if len(sys.argv) > 1:
-        for i in range(1, len(sys.argv), 2):
-            if sys.argv[i].startswith("--"):
-                key = sys.argv[i].lstrip("--")
-                if i + 1 < len(sys.argv):
-                    args[key] = sys.argv[i + 1]
-    return args
 
-args = parse_args()
-ISO3 = args["iso3"].upper()
+# os.environ["CONFIG_PATH"] = "./config.json"
 
-# ---------------------------------------------------------------------
-# CONFIGURATION
-# ---------------------------------------------------------------------
-CATALOG = "prp_mr_bdap_projects"
-SCHEMA = "geospatialsolutions"
-BASE_OUTPUT_TABLE = f"{CATALOG}.{SCHEMA}.building_enrichment_output_{ISO3.lower()}"
+# ================================================================================
+# CLI ARGUMENT PARSER
+# ================================================================================
+if len(sys.argv) > 1:
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--"):
+            k = a.lstrip("-").upper()
+            v = ""
+            if (i + 1) < len(args) and not args[i + 1].startswith("--"):
+                v = args[i + 1]
+                i += 2
+            else:
+                i += 1
+            if v != "":
+                os.environ[k] = v
+        else:
+            i += 1
+
+# ================================================================================
+# CONFIG LOADER
+# ================================================================================
+DEFAULT_CONFIG = {
+    "catalog": "prp_mr_bdap_projects",
+    "schema": "geospatialsolutions",
+    "output_table": None,
+    "output_dir": None,
+    "iso3": "IND"
+}
+
+def _read_json_path(path: str) -> dict:
+    if path.startswith("dbfs:"):
+        local = path.replace("dbfs:", "/dbfs", 1)
+    else:
+        local = path
+    with open(local, "r") as f:
+        return json.load(f)
+
+def load_config() -> dict:
+    cfg = dict(DEFAULT_CONFIG)
+    cfg_path = os.environ.get("CONFIG_PATH") or os.environ.get("CONFIG")
+    if cfg_path:
+        try:
+            loaded = _read_json_path(cfg_path)
+            cfg.update(loaded)
+        except Exception as e:
+            print(f"Warning: Could not load config from {cfg_path}: {e}")
+
+    # Override with env vars
+    for k in list(cfg.keys()):
+        env = os.environ.get(k.upper())
+        if env:
+            cfg[k] = env
+
+    # Validate required
+    if not cfg.get("output_dir"):
+        raise RuntimeError("Missing required config key: output_dir")
+
+    return cfg
+
+# ================================================================================
+# LOAD CONFIGURATION
+# ================================================================================
+cfg = load_config()
+CATALOG = cfg.get("catalog")
+SCHEMA = cfg.get("schema")
+ISO3 = cfg.get("iso3").upper()
+OUTPUT_DIR = cfg.get("output_dir")
+
+# Derive paths from config (no hardcoding!)
+BASE_OUTPUT_TABLE = cfg.get("output_table")
+if not BASE_OUTPUT_TABLE:
+    BASE_OUTPUT_TABLE = f"{CATALOG}.{SCHEMA}.building_enrichment_output_{ISO3.lower()}"
+
 BASE_VIEW_NAME = f"{CATALOG}.{SCHEMA}.building_enrichment_tsi_proportions_{ISO3.lower()}"
 
-# Constant export folder per ISO3
-EXPORT_FOLDER = f"/Volumes/{CATALOG}/{SCHEMA}/external/jrc/data/outputs/exports/FULL_{ISO3}"
+# Export folder: {output_dir}/exports/FULL_{ISO3}
+EXPORT_FOLDER = f"{OUTPUT_DIR}/exports/FULL_{ISO3}"
+
+# Excel summary path
+OUTPUT_PATH = f"{OUTPUT_DIR}/exports/building_summary_country_layout_{ISO3}.xlsx"
 
 LOBS = ["res", "com", "ind"]
-
-# Toggle Excel summary
 GENERATE_SUMMARY_EXCEL = True
 
-# Excel summary config
-INPUT_TABLE = f"{CATALOG}.{SCHEMA}.building_enrichment_output_{ISO3.lower()}"
-OUTPUT_PATH = f"/Volumes/{CATALOG}/{SCHEMA}/external/jrc/data/outputs/exports/building_summary_country_layout_{ISO3}.xlsx"
+# For Excel summary
+INPUT_TABLE = BASE_OUTPUT_TABLE
 
 # ---------------------------------------------------------------------
 # INITIAL SETUP
@@ -346,7 +438,8 @@ print("\nAll exports complete, previous versions replaced.")
 
 # # Export paths
 # TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
-# EXPORT_FOLDER = f"/Volumes/{CATALOG}/{SCHEMA}/external/jrc/data/outputs/exports/FULL_{ISO3}_{TIMESTAMP}"
+# NOTE: To enable timestamped exports instead of overwriting:
+# EXPORT_FOLDER = f"{OUTPUT_DIR}/exports/FULL_{ISO3}_{TIMESTAMP}"
 
 # # LOBs to export
 # LOBS = ["res", "com", "ind"]

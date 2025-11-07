@@ -1,10 +1,38 @@
 #!/usr/bin/env python3
-### add support of commas
 """
-Task 1 — Load multipliers (proportions, TSI) into Delta tables (ROBUST VERSION)
+Task 1 — Load Multipliers (Proportions & TSI) into Delta Tables
 
-ENHANCED FEATURES:
-==================
+Loads building storey proportions and Total Sum Insured (TSI) multipliers from
+CSV files into Delta tables for use by downstream tasks.
+
+Configuration:
+--------------
+Reads from config.json (generated from config.yaml via config_builder.py).
+All table names are auto-generated from the YAML configuration.
+
+Required config keys:
+  - proportions_csv_path: Path to proportions CSV
+  - tsi_csv_path: Path to TSI multipliers CSV
+  - proportions_table: Output Delta table for proportions
+  - tsi_table: Output Delta table for TSI
+  - iso3: Country ISO3 code
+  - catalog: Databricks catalog
+  - schema: Databricks schema
+
+Usage:
+------
+  python task1_proportions_to_delta.py --config_path config.json
+
+Or with CLI overrides:
+  python task1_proportions_to_delta.py --config_path config.json --iso3 USA
+
+Output:
+-------
+  - Delta table: {catalog}.{schema}.building_enrichment_proportions_input
+  - Delta table: {catalog}.{schema}.building_enrichment_tsi_input
+
+ROBUST FEATURES:
+================
 1. **Intelligent Numeric Format Detection**:
    - Handles comma decimals (European: 0,49 → 0.49)
    - Handles period decimals (US: 0.49 → 0.49)
@@ -28,15 +56,14 @@ ENHANCED FEATURES:
    - Encoding detection (UTF-8, Latin-1)
    - Missing column handling with defaults
 
-Usage:
-------
-Upload config to DBFS and run with:
-  ["--config_path", "dbfs:/configs/task1_config.json"]
+Proportions Format:
+-------------------
+Expected columns: built, 1, 2, 3, 4_5, 6_8, 9_20, 20
+Values should sum to 1.0 (or 100% if percentages)
 
-Or override specific keys:
-  ["--config_path", "dbfs:/configs/task1_config.json", 
-   "--iso3", "IND",
-   "--auto_normalize_bad_rows", "True"]
+TSI Format:
+-----------
+Expected columns: built, tsi_m2
 """
 
 import os
