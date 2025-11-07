@@ -1,0 +1,290 @@
+# Building Data Enrichment Job Configuration
+# This job processes GHSL data to generate building density estimates
+
+resources:
+  jobs:
+    building_enrichment_${var.country_iso3}:
+      name: "Building Data Enrichment - ${var.country_iso3} [${bundle.target}]"
+
+      description: |
+        Geospatial Solutions Pipeline - Building Data Enrichment
+
+        This pipeline processes Global Human Settlement Layer (GHSL) data to generate
+        building density estimates and Total Sum Insured (TSI) calculations at a 5km
+        grid resolution.
+
+        Environment: ${bundle.target}
+        Catalog: ${var.catalog}
+        Schema: ${var.schema}
+        Country: ${var.country_iso3}
+
+        Pipeline Tasks:
+        0. Config Generation - Generate config.json from config.yaml
+        1. Import Proportions - Load multiplier CSVs to Delta
+        2. Grid Generation - Create 5km grid centroids
+        3. Tile Download - Download GHSL tiles from JRC
+        4. Raster Stats - Extract building counts from tiles
+        5. Post-Processing - Calculate sector estimates with TSI
+        6. Create Views - Generate TSI proportion SQL views
+        7. Export - Export final results to various formats
+
+        Links:
+        - Workflow: https://adb-6685660099993059.19.azuredatabricks.net/jobs/{job_id}
+        - Output Table: ${var.catalog}.${var.schema}.building_enrichment_output
+
+      # Job settings
+      max_concurrent_runs: 1
+      timeout_seconds: 0  # No timeout
+
+      # Email notifications
+      email_notifications:
+        on_start:
+          - ${var.email_notifications}
+        on_success:
+          - ${var.email_notifications}
+        on_failure:
+          - ${var.email_notifications}
+        no_alert_for_skipped_runs: false
+
+      # Notification settings for various states
+      notification_settings:
+        no_alert_for_skipped_runs: false
+        no_alert_for_canceled_runs: false
+
+      # Schedule (optional - uncomment to enable)
+      # schedule:
+      #   quartz_cron_expression: "0 0 2 * * ?"  # 2 AM daily
+      #   timezone_id: "America/New_York"
+      #   pause_status: UNPAUSED
+
+      # Use cluster defined in clusters.yml
+      job_cluster_key: main_cluster
+
+      # Task definitions
+      tasks:
+        # ====================================================================
+        # TASK 0: Configuration Generation
+        # ====================================================================
+        - task_key: task0_config_generation
+          description: |
+            Generate config.json from config.yaml using config_builder.py.
+            This ensures all pipeline tasks use a consistent, version-controlled
+            configuration generated from the simplified YAML format.
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/config_builder.py
+            parameters:
+              - ${var.workspace_path}/config.yaml
+              - --output
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          timeout_seconds: 300  # 5 minutes max
+
+          max_retries: 1
+          min_retry_interval_millis: 10000
+          retry_on_timeout: true
+
+        # ====================================================================
+        # TASK 1: Import Proportions
+        # ====================================================================
+        - task_key: task1_import_proportions
+          description: |
+            Load building type proportions and TSI multiplier CSVs to Delta tables.
+            Creates:
+            - ${var.catalog}.${var.schema}.building_enrichment_proportions_input
+            - ${var.catalog}.${var.schema}.building_enrichment_tsi_input
+
+          depends_on:
+            - task_key: task0_config_generation
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task1_proportions_to_delta.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          timeout_seconds: 1800  # 30 minutes
+
+          max_retries: 2
+          min_retry_interval_millis: 30000
+
+        # ====================================================================
+        # TASK 2: Grid Generation
+        # ====================================================================
+        - task_key: task2_grid_generation
+          description: |
+            Generate 5km grid centroids with stable, reproducible cell IDs.
+            Uses admin boundaries and tile footprints to create grid cells.
+            Output: ${var.catalog}.${var.schema}.grid_centroids
+
+          depends_on:
+            - task_key: task1_import_proportions
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task2_grid_generation.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          libraries:
+            - pypi:
+                package: geopandas==0.14.4
+            - pypi:
+                package: shapely==2.0.4
+
+          timeout_seconds: 3600  # 1 hour
+
+          max_retries: 2
+          min_retry_interval_millis: 60000
+
+        # ====================================================================
+        # TASK 3: Tile Download
+        # ====================================================================
+        - task_key: task3_tile_download
+          description: |
+            Download GHSL tiles (built_c and smod) from JRC public repositories.
+            Downloads tiles covering the grid extent for ${var.country_iso3}.
+            Output: ${var.catalog}.${var.schema}.download_status
+
+          depends_on:
+            - task_key: task2_grid_generation
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task3_tile_downloader.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          timeout_seconds: 7200  # 2 hours for large downloads
+
+          max_retries: 3  # More retries for network issues
+          min_retry_interval_millis: 120000
+
+        # ====================================================================
+        # TASK 4: Raster Statistics
+        # ====================================================================
+        - task_key: task4_raster_stats
+          description: |
+            Extract building counts from downloaded raster tiles.
+            Processes GHSL built_c and smod tiles to generate building statistics
+            for each grid cell by building class and urban/rural classification.
+            Output: ${var.catalog}.${var.schema}.grid_counts
+
+          depends_on:
+            - task_key: task3_tile_download
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task4_raster_stats.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          libraries:
+            - pypi:
+                package: rasterio==1.3.9
+            - pypi:
+                package: geopandas==0.14.4
+
+          timeout_seconds: 10800  # 3 hours for intensive processing
+
+          max_retries: 2
+          min_retry_interval_millis: 120000
+
+        # ====================================================================
+        # TASK 5: Post-Processing
+        # ====================================================================
+        - task_key: task5_proportions_multiplications
+          description: |
+            Calculate sector-specific building estimates using proportions and TSI.
+            Applies building type distributions and TSI multipliers to raw counts.
+            Output: ${var.catalog}.${var.schema}.building_enrichment_output
+
+          depends_on:
+            - task_key: task4_raster_stats
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task5_post_processing.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          timeout_seconds: 3600  # 1 hour
+
+          max_retries: 2
+          min_retry_interval_millis: 60000
+
+        # ====================================================================
+        # TASK 6: Create Views
+        # ====================================================================
+        - task_key: task6_create_views
+          description: |
+            Create TSI proportion SQL views for Residential, Commercial, and Industrial.
+            Generates derived views from the estimates table for easier querying.
+            Views:
+            - ${var.catalog}.${var.schema}.tsi_proportions_res_${var.country_iso3}
+            - ${var.catalog}.${var.schema}.tsi_proportions_com_${var.country_iso3}
+            - ${var.catalog}.${var.schema}.tsi_proportions_ind_${var.country_iso3}
+
+          depends_on:
+            - task_key: task5_proportions_multiplications
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task6_create_views.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          timeout_seconds: 1800  # 30 minutes
+
+          max_retries: 2
+          min_retry_interval_millis: 30000
+
+        # ====================================================================
+        # TASK 7: Export Results
+        # ====================================================================
+        - task_key: task7_exports
+          description: |
+            Export final results to various formats (CSV, Excel, Parquet).
+            Creates downloadable exports of the enriched building data.
+
+          depends_on:
+            - task_key: task6_create_views
+
+          spark_python_task:
+            python_file: ${var.workspace_path}/task7_export.py
+            parameters:
+              - --config_path
+              - ${var.workspace_path}/config.json
+
+          job_cluster_key: main_cluster
+
+          libraries:
+            - pypi:
+                package: xlsxwriter==3.2.9
+
+          timeout_seconds: 3600  # 1 hour
+
+          max_retries: 2
+          min_retry_interval_millis: 60000
+
+      # Tags for organization and cost tracking
+      tags:
+        environment: ${bundle.target}
+        project: geospatial_solutions
+        pipeline: building_enrichment
+        country: ${var.country_iso3}
+        owner: npokkiri@munichre.com
