@@ -17,7 +17,7 @@ data/inputs/
 └── reference_data/       # Reference datasets (small files only)
     ├── README.md        # Instructions
     └── tile_footprint/
-        └── GHSL2_0_MWD_L1_tile_schema_land.shp (place shapefiles here)
+        └── GHSL2_0_MWD_L1_tile_schema_land.gpkg (place shapefiles here)
 ```
 
 ## 📋 What Goes Here
@@ -36,10 +36,10 @@ data/inputs/
 - **Action**: Place `tsi.csv` here
 
 **Tile Footprint** (`reference_data/tile_footprint/`)
-- GHSL tile schema shapefile
-- Small shapefile (< 50 MB)
+- GHSL tile schema GeoPackage
+- Small file (< 50 MB)
 - Static reference data
-- **Action**: Place shapefile and related files (.shp, .shx, .dbf, .prj) here
+- **Action**: Place GeoPackage file (.gpkg) here (easier than shapefile - single file!)
 
 ### ❌ DO NOT Include (Large Files → Use Volumes)
 
@@ -61,8 +61,8 @@ cp /path/to/your/IND_NOS_storey_mapping.csv proportions/
 # 2. Add TSI multipliers
 cp /path/to/your/tsi.csv multipliers/
 
-# 3. Add tile footprint shapefile (if you have it)
-cp /path/to/GHSL2_0_MWD_L1_tile_schema_land.* reference_data/tile_footprint/
+# 3. Add tile footprint GeoPackage (if you have it)
+cp /path/to/GHSL2_0_MWD_L1_tile_schema_land.gpkg reference_data/tile_footprint/
 ```
 
 ### Step 2: Update config.yaml
@@ -74,7 +74,7 @@ inputs:
   # ✅ Bundled files (small, in data/)
   proportions_csv: ${workspace.root_path}/files/data/inputs/proportions/IND_NOS_storey_mapping.csv
   tsi_csv: ${workspace.root_path}/files/data/inputs/multipliers/tsi.csv
-  tile_footprint: ${workspace.root_path}/files/data/inputs/reference_data/tile_footprint/GHSL2_0_MWD_L1_tile_schema_land.shp
+  tile_footprint: ${workspace.root_path}/files/data/inputs/reference_data/tile_footprint/GHSL2_0_MWD_L1_tile_schema_land.gpkg
 
   # ❌ Large files (keep in Volumes)
   admin_boundaries: /Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/admin/RMS_Admin0_geozones.gpkg
@@ -94,9 +94,9 @@ databricks bundle deploy
 | File Type | Max Size | Location |
 |-----------|----------|----------|
 | **CSV files** | < 50 MB | ✅ Bundle (`data/inputs/`) |
-| **Small shapefiles** | < 50 MB | ✅ Bundle (`data/inputs/reference_data/`) |
-| **Large shapefiles** | > 50 MB | ❌ Volumes only |
-| **GeoPackages** | Any size | ❌ Volumes only (unless tiny) |
+| **Small GeoPackages** | < 50 MB | ✅ Bundle (`data/inputs/reference_data/`) |
+| **Large GeoPackages** | > 50 MB | ❌ Volumes only |
+| **World boundaries (250 MB)** | Any large size | ❌ Volumes only |
 
 ## 🔍 Verifying Your Setup
 

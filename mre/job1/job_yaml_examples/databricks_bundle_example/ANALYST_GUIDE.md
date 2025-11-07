@@ -71,7 +71,7 @@ inputs:
   # ✅ Files in bundle (small, < 50 MB)
   proportions_csv: ${workspace.root_path}/files/data/inputs/proportions/IND_NOS_storey_mapping.csv
   tsi_csv: ${workspace.root_path}/files/data/inputs/multipliers/tsi.csv
-  tile_footprint: ${workspace.root_path}/files/data/inputs/reference_data/tile_footprint/GHSL2_0_MWD_L1_tile_schema_land.shp
+  tile_footprint: ${workspace.root_path}/files/data/inputs/reference_data/tile_footprint/GHSL2_0_MWD_L1_tile_schema_land.gpkg
 
   # ❌ Large files (keep in Volumes - world shapefile ~250 MB)
   admin_boundaries: /Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/admin/RMS_Admin0_geozones.gpkg

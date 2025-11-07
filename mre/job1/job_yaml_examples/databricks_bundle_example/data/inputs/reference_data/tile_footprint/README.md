@@ -8,7 +8,7 @@ Place the GHSL tile footprint shapefile components here.
 
 ```
 tile_footprint/
-├── GHSL2_0_MWD_L1_tile_schema_land.shp  ← Main shapefile
+├── GHSL2_0_MWD_L1_tile_schema_land.gpkg  ← Main shapefile
 ├── GHSL2_0_MWD_L1_tile_schema_land.shx  ← Shape index
 ├── GHSL2_0_MWD_L1_tile_schema_land.dbf  ← Attribute table
 ├── GHSL2_0_MWD_L1_tile_schema_land.prj  ← Projection info
@@ -40,7 +40,7 @@ Update `config.yaml` at bundle root:
 
 ```yaml
 inputs:
-  tile_footprint: ${workspace.root_path}/files/data/inputs/reference_data/tile_footprint/GHSL2_0_MWD_L1_tile_schema_land.shp
+  tile_footprint: ${workspace.root_path}/files/data/inputs/reference_data/tile_footprint/GHSL2_0_MWD_L1_tile_schema_land.gpkg
 ```
 
 ## 🔍 Data Info
@@ -52,14 +52,14 @@ inputs:
 
 ## ⚠️ Size Warning
 
-If your shapefile is > 50 MB:
+If your GeoPackage is > 50 MB:
 1. ❌ **Don't bundle it** (too large for git)
 2. ✅ **Place in Volumes**: `/Volumes/.../reference_data/tiles/`
 3. ✅ **Update config.yaml** to reference Volume path
 
 ## 💾 Placeholder
 
-This directory is currently empty. **You need to add the shapefile components.**
+This directory is currently empty. **You need to add the GeoPackage file.**
 
 If you don't have the file yet, it should be available from:
 - Your Databricks Volumes

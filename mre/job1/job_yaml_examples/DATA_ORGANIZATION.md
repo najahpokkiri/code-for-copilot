@@ -76,7 +76,7 @@ databricks_bundle_example/
 
 **Examples from your pipeline:**
 - `RMS_Admin0_geozones.gpkg` - **World administrative boundaries**
-- `GHSL2_0_MWD_L1_tile_schema_land.shp` - **Tile footprint**
+- `GHSL2_0_MWD_L1_tile_schema_land.gpkg` - **Tile footprint**
 
 **Characteristics:**
 - 🔒 Rarely changes (months/years between updates)
@@ -92,7 +92,7 @@ databricks_bundle_example/
     ├── admin/
     │   └── RMS_Admin0_geozones.gpkg        # World shapefile
     └── tiles/
-        └── GHSL2_0_MWD_L1_tile_schema_land.shp   # Tile footprint
+        └── GHSL2_0_MWD_L1_tile_schema_land.gpkg   # Tile footprint
 ```
 
 **Why separate shared location?**
@@ -158,7 +158,7 @@ Your Setup:
     │   ├── admin/                     # Reference data (shared)
     │   │   └── RMS_Admin0_geozones.gpkg
     │   └── tiles/                     # Reference data (shared)
-    │       └── GHSL2_0_MWD_L1_tile_schema_land.shp
+    │       └── GHSL2_0_MWD_L1_tile_schema_land.gpkg
     └── /Volumes/.../outputs/          # Generated data
         └── exports/
 ```
@@ -175,7 +175,7 @@ inputs:
 
   # Reference data - in shared Volumes location
   admin_boundaries: /Volumes/catalog/schema/reference_data/admin/RMS_Admin0_geozones.gpkg
-  tile_footprint: /Volumes/catalog/schema/reference_data/tiles/GHSL2_0_MWD_L1_tile_schema_land.shp
+  tile_footprint: /Volumes/catalog/schema/reference_data/tiles/GHSL2_0_MWD_L1_tile_schema_land.gpkg
 ```
 
 ---
@@ -196,7 +196,7 @@ All data in Volumes:
 │   │   ├── admin/                     # Reference data
 │   │   │   └── RMS_Admin0_geozones.gpkg
 │   │   └── tiles/                     # Reference data
-│   │       ├── GHSL2_0_MWD_L1_tile_schema_land.shp
+│   │       ├── GHSL2_0_MWD_L1_tile_schema_land.gpkg
 │   │       ├── built_c/               # Downloaded tiles
 │   │       └── smod/                  # Downloaded tiles
 │   └── outputs/
@@ -316,12 +316,12 @@ tsi_csv: ${workspace.root_path}/files/data/multipliers/tsi.csv
 
 ---
 
-### 4. **Tile Footprint** (GHSL2_0_MWD_L1_tile_schema_land.shp)
+### 4. **Tile Footprint** (GHSL2_0_MWD_L1_tile_schema_land.gpkg)
 **Location:** ✅ **Volumes - Shared Reference Location**
 
 ```bash
 # Current location (OK):
-/Volumes/.../data/inputs/tiles/GHSL2_0_MWD_L1_tile_schema_land.shp
+/Volumes/.../data/inputs/tiles/GHSL2_0_MWD_L1_tile_schema_land.gpkg
 
 # Same as admin boundaries - this is reference data
 ```
@@ -451,7 +451,7 @@ Databricks Volumes:
    ├── admin/
    │   └── RMS_Admin0_geozones.gpkg
    └── tiles/
-       └── GHSL2_0_MWD_L1_tile_schema_land.shp
+       └── GHSL2_0_MWD_L1_tile_schema_land.gpkg
    ```
 
 2. **Update config.yaml** to reference new locations:
@@ -460,7 +460,7 @@ Databricks Volumes:
      proportions_csv: /Volumes/.../inputs/proportions/${iso3}_NOS_storey_mapping.csv
      tsi_csv: /Volumes/.../inputs/multipliers/tsi.csv
      admin_boundaries: /Volumes/.../reference_data/admin/RMS_Admin0_geozones.gpkg
-     tile_footprint: /Volumes/.../reference_data/tiles/GHSL2_0_MWD_L1_tile_schema_land.shp
+     tile_footprint: /Volumes/.../reference_data/tiles/GHSL2_0_MWD_L1_tile_schema_land.gpkg
    ```
 
 3. **Keep files in Volumes** (don't add to bundle)

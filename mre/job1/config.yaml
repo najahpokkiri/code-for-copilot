@@ -28,8 +28,8 @@ inputs:
   # Administrative boundaries (GeoPackage)
   admin_boundaries: /Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/admin/RMS_Admin0_geozones.gpkg
 
-  # GHSL tile footprint (Shapefile)
-  tile_footprint: /Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/tiles/GHSL2_0_MWD_L1_tile_schema_land.shp
+  # GHSL tile footprint (GeoPackage)
+  tile_footprint: /Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/tiles/GHSL2_0_MWD_L1_tile_schema_land.gpkg
 
 # ============================================================================
 # PROCESSING PARAMETERS
