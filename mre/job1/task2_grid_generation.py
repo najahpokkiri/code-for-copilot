@@ -12,7 +12,7 @@ All paths and table names are auto-generated from the YAML configuration.
 
 Required config keys:
   - admin_path: Path to admin boundaries (GeoPackage)
-  - tile_footprint_path: Path to GHSL tile footprint (Shapefile)
+  - tile_footprint_path: Path to GHSL tile footprint (GeoPackage or Shapefile)
   - grid_output_csv: Output path for grid CSV
   - delta_table_base: Base name for Delta table
   - iso3: Country ISO3 code

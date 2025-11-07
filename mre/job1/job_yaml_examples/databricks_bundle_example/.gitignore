@@ -64,14 +64,6 @@ temp/
 *.log
 logs/
 
-# Local data (don't commit large datasets)
-data/local/
-*.csv
-*.parquet
-*.xlsx
-*.tif
-*.tiff
-
 # Secrets and credentials
 .env
 .env.*
@@ -80,5 +72,51 @@ credentials/
 *.pem
 *.key
 
-# Bundle deployment artifacts (if needed, can commit these)
+# Bundle deployment artifacts
 # .databricks/
+
+# =============================================================================
+# DATA FILES - Be Selective About What to Commit
+# =============================================================================
+
+# Large reference data (ALWAYS exclude from git)
+# World shapefiles, admin boundaries > 100 MB
+data/**/admin/*.gpkg
+data/**/admin/*.shp
+data/**/boundaries/*.gpkg
+data/**/boundaries/*.shp
+
+# Very large files (> 100 MB)
+**/*[Ww]orld*.gpkg
+**/*[Ww]orld*.shp
+**/*[Aa]dmin*.gpkg
+**/*[Gg]lobal*.gpkg
+**/RMS_Admin0*.gpkg
+
+# Allow small CSV files (< 50 MB) - analysts place input data here
+!data/inputs/proportions/*.csv
+!data/inputs/multipliers/*.csv
+
+# Allow small shapefiles (< 50 MB) - like tile footprints
+!data/inputs/reference_data/tile_footprint/*.shp
+!data/inputs/reference_data/tile_footprint/*.shx
+!data/inputs/reference_data/tile_footprint/*.dbf
+!data/inputs/reference_data/tile_footprint/*.prj
+!data/inputs/reference_data/tile_footprint/*.cpg
+
+# But block if they're too large (safety check)
+# Git will reject files > 100 MB anyway, but this helps catch them early
+
+# Large data outputs (never commit)
+data/outputs/**
+data/local/**
+*.parquet
+*.xlsx
+*.tif
+*.tiff
+
+# Downloaded tiles (never commit)
+data/**/tiles/**/*.tif
+data/**/tiles/**/*.tiff
+data/**/built_c/**
+data/**/smod/**
