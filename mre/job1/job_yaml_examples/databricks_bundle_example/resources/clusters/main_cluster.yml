@@ -1,0 +1,65 @@
+# Cluster Configuration for Building Enrichment Pipeline
+
+resources:
+  job_clusters:
+    main_cluster:
+      new_cluster:
+        # Databricks Runtime Version
+        spark_version: "13.3.x-scala2.12"
+
+        # Node type (adjust based on workload)
+        # Standard_DS3_v2: 4 cores, 14 GB RAM (good for moderate workloads)
+        # Consider Standard_DS4_v2 or DS5_v2 for heavier processing
+        node_type_id: Standard_DS3_v2
+
+        # Number of worker nodes
+        # Adjust based on data volume and processing requirements
+        num_workers: 4
+
+        # Autoscaling (alternative to fixed num_workers)
+        # Uncomment to enable autoscaling
+        # autoscale:
+        #   min_workers: 2
+        #   max_workers: 8
+
+        # Spark configuration
+        spark_conf:
+          # Delta Lake optimizations
+          spark.databricks.delta.optimizeWrite.enabled: "true"
+          spark.databricks.delta.autoCompact.enabled: "true"
+          spark.databricks.delta.properties.defaults.autoOptimize.optimizeWrite: "true"
+          spark.databricks.delta.properties.defaults.autoOptimize.autoCompact: "true"
+
+          # Performance tuning
+          spark.sql.adaptive.enabled: "true"
+          spark.sql.adaptive.coalescePartitions.enabled: "true"
+
+          # Memory settings (adjust based on node type)
+          spark.driver.memory: "8g"
+          spark.executor.memory: "8g"
+
+          # Shuffle settings for large datasets
+          spark.sql.shuffle.partitions: "200"
+
+        # Environment variables
+        spark_env_vars:
+          PYTHONPATH: "/databricks/python3/bin/python"
+
+        # Custom tags for cost tracking
+        custom_tags:
+          project: geospatial_solutions
+          pipeline: building_enrichment
+          managed_by: databricks_bundle
+
+        # Enable local disk encryption
+        enable_local_disk_encryption: false
+
+        # Cluster log configuration (optional)
+        # cluster_log_conf:
+        #   dbfs:
+        #     destination: "dbfs:/cluster-logs"
+
+        # Init scripts (optional - for custom setup)
+        # init_scripts:
+        #   - dbfs:
+        #       destination: "dbfs:/databricks/init_scripts/install_deps.sh"
