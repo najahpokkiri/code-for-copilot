@@ -19,6 +19,35 @@ This pipeline processes Global Human Settlement Layer (GHSL) data to generate bu
 - **Boundary-aware processing** for accurate edge handling
 
 ---
+
+## ⚙️ Configuration System
+
+The pipeline uses a **simplified YAML-based configuration system** that auto-generates all paths and table names.
+
+### Quick Start
+
+```bash
+# 1. Edit the simplified config
+vim config.yaml
+
+# 2. Generate full configuration
+python config_builder.py config.yaml
+
+# 3. Use in pipeline (tasks read config.json as before)
+python task1_proportions_to_delta.py --config_path config.json
+```
+
+### Benefits
+
+- **63% less verbose**: 20 lines instead of 54
+- **Auto-generates**: All derived paths, table names, folder structures
+- **Easy country switching**: Change ISO3 code → regenerate → done
+- **Type-safe**: Prevents inconsistencies in repeated patterns
+
+📖 **See [CONFIG_GUIDE.md](./CONFIG_GUIDE.md) for full documentation**
+
+---
+
 ### GHSL Datasets
 
 a bit of on the datasets
