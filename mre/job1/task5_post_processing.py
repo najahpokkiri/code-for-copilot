@@ -193,10 +193,11 @@ def add_id_and_order(step2_df: DataFrame) -> DataFrame:
     # Create ID as lon_lat string (longitude first, preserving minus signs)
     # IMPORTANT: Explicitly cast to string to avoid NULL/VOID type issues
     df = df.withColumn(
-        "ID", 
-        F.concat_ws("_", 
-                    F.col("lon").cast("string"), 
-                    F.col("lat").cast("string"))
+        "ID",
+        F.regexp_replace(
+            F.concat_ws("_", F.col("lon").cast("string"), F.col("lat").cast("string")),
+            r"\.", ""
+        )
     )
     
     # Ensure ID is string type (defensive coding)
