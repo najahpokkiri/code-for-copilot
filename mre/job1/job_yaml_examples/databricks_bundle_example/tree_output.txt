@@ -1,0 +1,22 @@
+databricks_bundle_example/
+├── databricks.yml
+├── config.yaml
+├── resources/
+│   ├── jobs/
+│   │   └── building_enrichment.yml
+│   └── clusters/
+│       └── main_cluster.yml
+├── src/
+│   ├── config_builder.py
+│   ├── task1_proportions_to_delta.py
+│   ├── task2_grid_generation.py
+│   ├── task3_tile_downloader.py
+│   ├── task4_raster_stats.py
+│   ├── task5_post_processing.py
+│   ├── task6_create_views.py
+│   └── task7_export.py
+├── .gitignore
+├── README.md
+└── STRUCTURE.md
+
+3 directories, 14 files
