@@ -1,0 +1,328 @@
+# ============================================================================
+# APPROACH 3: Databricks Asset Bundles (MODERN - BEST PRACTICE)
+# ============================================================================
+#
+# Pros:
+#   ✓ Modern Databricks standard (introduced 2023)
+#   ✓ Full CI/CD support
+#   ✓ Environment management (dev/staging/prod)
+#   ✓ Variable interpolation
+#   ✓ Automatic deployment
+#   ✓ Version controlled
+#   ✓ Git integration
+#
+# Cons:
+#   ~ Requires Databricks CLI >= 0.205.0
+#   ~ Learning curve for bundles
+#
+# Use when:
+#   - Modern Databricks workflows
+#   - CI/CD pipelines
+#   - Multiple environments
+#   - Team collaboration
+#   - Production deployments
+#
+# Docs: https://docs.databricks.com/dev-tools/bundles/
+#
+# ============================================================================
+
+# This file should be named: databricks.yml (in project root)
+
+bundle:
+  name: geospatial_pipeline
+
+# ============================================================================
+# WORKSPACE CONFIGURATION
+# ============================================================================
+workspace:
+  host: https://adb-6685660099993059.19.azuredatabricks.net
+
+# ============================================================================
+# VARIABLES (can be overridden per environment)
+# ============================================================================
+variables:
+  catalog:
+    description: Databricks catalog name
+    default: prp_mr_bdap_projects
+
+  schema:
+    description: Databricks schema name
+    default: geospatialsolutions
+
+  iso3:
+    description: Country ISO3 code
+    default: IND
+
+  cluster_id:
+    description: Existing cluster ID to use
+    default: 1010-130900-1bz314p1
+
+# ============================================================================
+# RESOURCES
+# ============================================================================
+resources:
+  jobs:
+    geospatial_pipeline:
+      name: "[${bundle.environment}] Geospatial Pipeline - ${var.iso3}"
+      description: |
+        GHSL building enrichment pipeline
+        Environment: ${bundle.environment}
+        Country: ${var.iso3}
+
+      queue:
+        enabled: true
+
+      tasks:
+        # ==================================================================
+        # TASK 0: Generate Configuration
+        # ==================================================================
+        - task_key: task0_generate_config
+          description: Generate config.json from config.yaml
+          spark_python_task:
+            python_file: ${workspace.file_path}/task0_generate_config.py
+            parameters:
+              - --config_yaml_path
+              - ${workspace.file_path}/config.yaml
+              - --output_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+
+        # ==================================================================
+        # TASK 1: Load Proportions
+        # ==================================================================
+        - task_key: task1_proportions_to_delta
+          description: Load proportions and TSI CSVs
+          depends_on:
+            - task_key: task0_generate_config
+          spark_python_task:
+            python_file: ${workspace.file_path}/task1_proportions_to_delta.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+
+        # ==================================================================
+        # TASK 2: Grid Generation
+        # ==================================================================
+        - task_key: task2_grid_generation
+          description: Generate 2km grid centroids
+          depends_on:
+            - task_key: task1_proportions_to_delta
+          spark_python_task:
+            python_file: ${workspace.file_path}/task2_grid_generation.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+          libraries:
+            - pypi:
+                package: rasterio==1.3.9
+            - pypi:
+                package: geopandas==0.14.4
+            - pypi:
+                package: shapely==2.0.4
+
+        # ==================================================================
+        # TASK 3: Download Tiles
+        # ==================================================================
+        - task_key: task3_tile_downloader
+          description: Download GHSL tiles
+          depends_on:
+            - task_key: task2_grid_generation
+          spark_python_task:
+            python_file: ${workspace.file_path}/task3_tile_downloader.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+
+        # ==================================================================
+        # TASK 4: Raster Statistics
+        # ==================================================================
+        - task_key: task4_raster_stats
+          description: Extract building counts
+          depends_on:
+            - task_key: task3_tile_downloader
+          spark_python_task:
+            python_file: ${workspace.file_path}/task4_raster_stats.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+          libraries:
+            - pypi:
+                package: rasterio==1.3.9
+
+        # ==================================================================
+        # TASK 5: Post-Processing
+        # ==================================================================
+        - task_key: task5_post_processing
+          description: Process counts and calculate TSI
+          depends_on:
+            - task_key: task4_raster_stats
+          spark_python_task:
+            python_file: ${workspace.file_path}/task5_post_processing.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+
+        # ==================================================================
+        # TASK 6: Create Views
+        # ==================================================================
+        - task_key: task6_create_views
+          description: Create per-LOB views
+          depends_on:
+            - task_key: task5_post_processing
+          spark_python_task:
+            python_file: ${workspace.file_path}/task6_create_views.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+
+        # ==================================================================
+        # TASK 7: Export
+        # ==================================================================
+        - task_key: task7_export
+          description: Export CSV and Excel
+          depends_on:
+            - task_key: task6_create_views
+          spark_python_task:
+            python_file: ${workspace.file_path}/task7_export.py
+            parameters:
+              - --config_path
+              - ${workspace.file_path}/config.json
+          existing_cluster_id: ${var.cluster_id}
+          libraries:
+            - pypi:
+                package: xlsxwriter==3.2.9
+
+# ============================================================================
+# TARGETS (Environments)
+# ============================================================================
+targets:
+  # Development environment
+  dev:
+    mode: development
+    workspace:
+      host: https://adb-6685660099993059.19.azuredatabricks.net
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/dev
+    variables:
+      cluster_id: 1010-130900-1bz314p1  # Dev cluster
+      iso3: IND
+
+  # Staging environment
+  staging:
+    mode: development
+    workspace:
+      host: https://adb-6685660099993059.19.azuredatabricks.net
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/staging
+    variables:
+      cluster_id: 1010-130900-1bz314p1  # Staging cluster
+      iso3: IND
+
+  # Production environment
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-6685660099993059.19.azuredatabricks.net
+      root_path: /Shared/.bundle/${bundle.name}/prod
+    variables:
+      cluster_id: 1010-130900-1bz314p1  # Production cluster
+      iso3: IND
+    permissions:
+      - level: CAN_VIEW
+        group_name: users
+
+# ============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ============================================================================
+#
+# Setup (one time):
+# -----------------
+# 1. Install Databricks CLI:
+#      curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+#
+# 2. Authenticate:
+#      databricks auth login --host https://your-workspace.cloud.databricks.com
+#
+# 3. Initialize bundle:
+#      cd your-project-root
+#      databricks bundle init
+#
+# Deploy to dev:
+# --------------
+# databricks bundle deploy --target dev
+#
+# Deploy to staging:
+# ------------------
+# databricks bundle deploy --target staging
+#
+# Deploy to prod:
+# ---------------
+# databricks bundle deploy --target prod
+#
+# Run job:
+# --------
+# databricks bundle run geospatial_pipeline --target dev
+#
+# Validate before deploy:
+# -----------------------
+# databricks bundle validate --target dev
+#
+# ============================================================================
+# GIT CLONE SCENARIO (Asset Bundles)
+# ============================================================================
+#
+# When someone clones this repo:
+#
+# 1. Clone repo:
+#      git clone https://github.com/your-org/geospatial-pipeline.git
+#      cd geospatial-pipeline
+#
+# 2. Edit config.yaml for your country
+#
+# 3. Edit databricks.yml variables (if needed)
+#
+# 4. Authenticate with Databricks:
+#      databricks auth login
+#
+# 5. Deploy to your dev environment:
+#      databricks bundle deploy --target dev
+#
+# 6. Run:
+#      databricks bundle run geospatial_pipeline --target dev
+#
+# That's it! The bundle automatically:
+#   - Syncs code to Databricks Workspace
+#   - Creates/updates job definitions
+#   - Manages permissions
+#   - Handles environments
+#
+# ============================================================================
+# CI/CD INTEGRATION (GitHub Actions Example)
+# ============================================================================
+#
+# .github/workflows/deploy.yml:
+#
+# name: Deploy to Databricks
+# on:
+#   push:
+#     branches: [main]
+#
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: databricks/setup-cli@main
+#       - name: Deploy to prod
+#         env:
+#           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+#           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+#         run: |
+#           databricks bundle deploy --target prod
+#           databricks bundle run geospatial_pipeline --target prod
+#
+# ============================================================================

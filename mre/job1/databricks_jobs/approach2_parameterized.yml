@@ -1,0 +1,217 @@
+# ============================================================================
+# APPROACH 2: Parameterized Paths (RECOMMENDED)
+# ============================================================================
+#
+# Pros:
+#   ✓ Single job definition for all users/environments
+#   ✓ Easy to change paths via job parameters
+#   ✓ No code changes needed for different users
+#   ✓ Can override at runtime
+#
+# Cons:
+#   ~ Slightly more complex setup
+#   ~ Need to set default parameters
+#
+# Use when:
+#   - Multiple users/environments
+#   - Want portability
+#   - Production deployments
+#
+# ============================================================================
+
+resources:
+  jobs:
+    geospatial_pipeline:
+      name: Geospatial Pipeline
+      description: |
+        GHSL building enrichment pipeline (parameterized)
+
+        Uses job parameters for paths, making it portable across:
+          - Different users
+          - Different environments (dev/prod)
+          - Different workspace locations
+
+        Parameters:
+          - workspace_path: Base path in Workspace
+          - iso3: Country code (IND, USA, etc.)
+          - cluster_id: Cluster to run on
+
+      queue:
+        enabled: true
+
+      # ======================================================================
+      # JOB PARAMETERS (Edit these for your environment)
+      # ======================================================================
+      parameters:
+        - name: workspace_path
+          default: /Workspace/Users/npokkiri@munichre.com/geospatial_pipeline
+
+        - name: iso3
+          default: IND
+
+        - name: cluster_id
+          default: 1010-130900-1bz314p1
+
+      # ======================================================================
+      # TASKS (Use {{workspace_path}} variable)
+      # ======================================================================
+      tasks:
+        # ====================================================================
+        # TASK 0: Generate Configuration
+        # ====================================================================
+        - task_key: task0_generate_config
+          description: Generate config.json from config.yaml
+          spark_python_task:
+            python_file: "{{workspace_path}}/task0_generate_config.py"
+            parameters:
+              - --config_yaml_path
+              - "{{workspace_path}}/config.yaml"
+              - --output_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+
+        # ====================================================================
+        # TASK 1: Load Proportions
+        # ====================================================================
+        - task_key: task1_proportions_to_delta
+          description: Load proportions and TSI CSVs to Delta tables
+          depends_on:
+            - task_key: task0_generate_config
+          spark_python_task:
+            python_file: "{{workspace_path}}/task1_proportions_to_delta.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+
+        # ====================================================================
+        # TASK 2: Grid Generation
+        # ====================================================================
+        - task_key: task2_grid_generation
+          description: Generate 2km grid centroids for country
+          depends_on:
+            - task_key: task1_proportions_to_delta
+          spark_python_task:
+            python_file: "{{workspace_path}}/task2_grid_generation.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+          libraries:
+            - pypi:
+                package: rasterio==1.3.9
+            - pypi:
+                package: geopandas==0.14.4
+            - pypi:
+                package: shapely==2.0.4
+
+        # ====================================================================
+        # TASK 3: Download Tiles
+        # ====================================================================
+        - task_key: task3_tile_downloader
+          description: Download GHSL tiles from JRC repository
+          depends_on:
+            - task_key: task2_grid_generation
+          spark_python_task:
+            python_file: "{{workspace_path}}/task3_tile_downloader.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+
+        # ====================================================================
+        # TASK 4: Raster Statistics
+        # ====================================================================
+        - task_key: task4_raster_stats
+          description: Extract building counts from raster tiles
+          depends_on:
+            - task_key: task3_tile_downloader
+          spark_python_task:
+            python_file: "{{workspace_path}}/task4_raster_stats.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+          libraries:
+            - pypi:
+                package: rasterio==1.3.9
+
+        # ====================================================================
+        # TASK 5: Post-Processing
+        # ====================================================================
+        - task_key: task5_post_processing
+          description: Process counts and calculate TSI
+          depends_on:
+            - task_key: task4_raster_stats
+          spark_python_task:
+            python_file: "{{workspace_path}}/task5_post_processing.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+
+        # ====================================================================
+        # TASK 6: Create Views
+        # ====================================================================
+        - task_key: task6_create_views
+          description: Create per-LOB TSI proportion views
+          depends_on:
+            - task_key: task5_post_processing
+          spark_python_task:
+            python_file: "{{workspace_path}}/task6_create_views.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+
+        # ====================================================================
+        # TASK 7: Export
+        # ====================================================================
+        - task_key: task7_export
+          description: Export CSV files and Excel summary
+          depends_on:
+            - task_key: task6_create_views
+          spark_python_task:
+            python_file: "{{workspace_path}}/task7_export.py"
+            parameters:
+              - --config_path
+              - "{{workspace_path}}/config.json"
+          existing_cluster_id: "{{cluster_id}}"
+          libraries:
+            - pypi:
+                package: xlsxwriter==3.2.9
+
+# ============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ============================================================================
+#
+# Option 1: Use default parameters (edit above)
+# ----------------------------------------------
+# databricks jobs create --json-file approach2_parameterized.yml
+#
+# Option 2: Override parameters at deployment
+# --------------------------------------------
+# databricks jobs create --json-file approach2_parameterized.yml \
+#   --parameter workspace_path=/Workspace/Users/yourname/pipeline \
+#   --parameter cluster_id=your-cluster-id
+#
+# Option 3: Override parameters at runtime
+# -----------------------------------------
+# databricks jobs run-now --job-id 12345 \
+#   --notebook-params '{"workspace_path": "/Workspace/Users/yourname/pipeline"}'
+#
+# ============================================================================
+# FOR NEW USERS (Git Clone Scenario)
+# ============================================================================
+#
+# 1. Clone the repo to your Databricks Workspace
+# 2. Edit config.yaml for your country
+# 3. Update job parameters above:
+#      workspace_path: /Workspace/Users/YOUR_NAME/geospatial_pipeline
+#      cluster_id: YOUR_CLUSTER_ID
+# 4. Deploy the job
+# 5. Run!
+#
+# That's it - no code changes needed!
+#
+# ============================================================================
