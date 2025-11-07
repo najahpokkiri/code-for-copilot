@@ -1,3 +1,44 @@
+#!/usr/bin/env python3
+"""
+Task 2 — Generate 2km Grid Centroids for Country
+
+Generates a regular grid of centroids at specified resolution (default 2000m)
+covering the intersection of country admin boundaries and GHSL tile footprints.
+
+Configuration:
+--------------
+Reads from config.json (generated from config.yaml via config_builder.py).
+All paths and table names are auto-generated from the YAML configuration.
+
+Required config keys:
+  - admin_path: Path to admin boundaries (GeoPackage)
+  - tile_footprint_path: Path to GHSL tile footprint (Shapefile)
+  - grid_output_csv: Output path for grid CSV
+  - delta_table_base: Base name for Delta table
+  - iso3: Country ISO3 code
+  - cell_size: Grid cell size in meters (default: 2000)
+  - target_crs: Target CRS for processing (default: ESRI:54009 Mollweide)
+  - export_crs: Export CRS (default: EPSG:4326 WGS84)
+
+Usage:
+------
+  python task2_grid_generation.py --config_path config.json
+
+Or with CLI overrides:
+  python task2_grid_generation.py --config_path config.json --iso3 USA --cell_size 5000
+
+Output:
+-------
+  - CSV file with grid centroids: grid_id, centroid_x, centroid_y, tile_id
+  - Delta table: {catalog}.{schema}.grid_centroids_{iso3}
+
+Notes:
+------
+  - Grids are generated only for tiles intersecting country boundaries
+  - Cell IDs are stable and reproducible based on Mollweide coordinates
+  - Proportions table is loaded to ensure consistency with Task 1
+"""
+
 import os
 import sys
 import json
@@ -32,12 +73,12 @@ if len(sys.argv) > 1:
             i += 1
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "proportions_path": "prp_mr_bdap_projects.geospatialsolutions.building_enrichment_proportions_input",
+    "proportions_path": None,
     "iso3": "IND",
-    "admin_path": "/dbfs/mnt/data/admin/RMS_Admin0_geozones.gpkg",
-    "tile_footprint_path": "/dbfs/mnt/data/tiles/GHSL2_0_MWD_L1_tile_schema_land.shp",
-    "grid_output_csv": "/dbfs/mnt/data/grid/india_5km_grid_centroids_IND.csv",
-    "delta_table_base": "prp_mr_bdap_projects.geospatialsolutions.grid_centroids",
+    "admin_path": None,
+    "tile_footprint_path": None,
+    "grid_output_csv": None,
+    "delta_table_base": None,
     "admin_field": "ISO3",
     "tile_id_field": "tile_id",
     "cell_size": 5000,

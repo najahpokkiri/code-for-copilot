@@ -1,26 +1,63 @@
-
+#!/usr/bin/env python3
 """
-Job 5 – Full Post-Processing Script with TSI Imputation (CSV-COMPATIBLE VERSION)
+Task 5 — Post-Processing & TSI Calculations
 
-MODIFICATIONS FROM ORIGINAL:
-1. Added filter to remove rows where ALL nr* columns are zero
-2. Added TSI percentage imputation with urban-specific averages
-3. **NEW: Ensures all output columns are CSV-compatible (no VOID/NULL types)**
-4. **NEW: Uses proper string casting for ID columns**
+Processes grid counts from Task 4 to generate building estimates with
+Total Sum Insured (TSI) calculations by storey and building type.
 
-- Loads config, input tables, and proportions/TSI tables.
-- Renames centroid_x/y to lat/lon immediately after loading input.
-- Runs all main Job 5 logic: pivot, ID/order, storey-level, TSI, percentages.
-- Filters out rows with all zero building counts
-- Imputes zero TSI percentages with urban-specific averages
-- Adds block sum columns for each output block
-- Arranges columns so each block is grouped and followed by its sum.
-- **Ensures CSV compatibility for downstream exports**
-- Saves output table.
+Configuration:
+--------------
+Reads from config.json (generated from config.yaml via config_builder.py).
+All table names are auto-generated from the YAML configuration.
+
+Required config keys:
+  - grid_count_table: Input table with grid counts from Task 4
+  - proportions_table: Proportions table from Task 1
+  - tsi_table: TSI multipliers table from Task 1
+  - output_table: Output Delta table for enriched data
+  - write_mode: Delta table write mode (default: "overwrite")
 
 Usage:
-- Run as a Databricks notebook or Python script with Spark.
-- Call with config path or set env variables as in your project.
+------
+  python task5_post_processing.py --config_path config.json
+
+Output:
+-------
+  - Delta table: {catalog}.{schema}.building_enrichment_output
+    Contains storey-level breakdowns by RES/COM/IND with TSI calculations
+
+PROCESSING STEPS:
+-----------------
+1. Pivot building counts: Convert built codes to LOB columns (RES/COM)
+2. Filter zero rows: Remove grids with no buildings
+3. Add ID/order: Generate unique IDs and spatial ordering
+4. Storey distribution: Apply proportions to distribute by storey levels
+5. TSI calculations: Multiply by TSI rates and compute percentages
+6. Imputation: Fill missing TSI percentages with urban-specific averages
+7. Column organization: Group related columns with block sums
+
+ENHANCEMENTS:
+-------------
+- Filters rows where ALL building counts are zero
+- Imputes zero TSI percentages using urban-specific averages
+- Ensures CSV compatibility (no VOID/NULL column types)
+- Adds block sum columns for validation
+- Proper string casting for ID columns
+
+Output Schema:
+--------------
+Core columns: grid_id, urban, lat, lon
+Building counts: nr{built}_{lob} (e.g., nr11_res, nr21_com)
+Storey-level: {lob}_storey{level} (e.g., res_storey1, com_storey4_5)
+TSI values: {lob}_storey{level}_TSI
+TSI percentages: {lob}_storey{level}_tsi_perc
+Block sums: Various *_SUM columns for validation
+
+Notes:
+------
+  - Coordinates renamed from centroid_x/y to lon/lat
+  - LOB mapping: built 11-15 → RES, 21-25 → COM
+  - Storey bins: 1, 2, 3, 4_5, 6_8, 9_20, 20
 """
 
 import os
