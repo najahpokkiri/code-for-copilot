@@ -4,7 +4,7 @@ Creates and configures the Databricks job for the building enrichment pipeline.
 """
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.jobs import Task, TaskDependency, SparkPythonTask
+from databricks.sdk.service.jobs import Task, TaskDependency, SparkPythonTask, JobEmailNotifications
 
 
 def create_databricks_job(
@@ -136,10 +136,10 @@ def create_databricks_job(
         tasks=tasks,
         max_concurrent_runs=1,
         timeout_seconds=0,
-        email_notifications={
-            "on_success": [email],
-            "on_failure": [email]
-        } if email else None
+        email_notifications=JobEmailNotifications(
+            on_success=[email],
+            on_failure=[email]
+        ) if email else None
     )
 
     return job.job_id, job_name
