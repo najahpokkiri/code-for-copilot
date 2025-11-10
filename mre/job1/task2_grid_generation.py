@@ -50,6 +50,7 @@ from typing import Dict, Any, Optional
 
 import numpy as np
 import geopandas as gpd
+import fiona
 from shapely.geometry import Point
 from pyspark.sql import SparkSession
 
@@ -153,14 +154,18 @@ def read_vector_file(path: str) -> gpd.GeoDataFrame:
                 tmp.write(data)
                 tmp.flush()
                 tmp_path = tmp.name
-            return gpd.read_file(tmp_path)
+            # Allow very large/complex GeoJSON features by removing size limit
+            with fiona.Env(OGR_GEOJSON_MAX_OBJ_SIZE=0):
+                return gpd.read_file(tmp_path)
         finally:
             if tmp_path:
                 try:
                     os.unlink(tmp_path)
                 except OSError:
                     pass
-    return gpd.read_file(path)
+    # Allow very large/complex GeoJSON features by removing size limit
+    with fiona.Env(OGR_GEOJSON_MAX_OBJ_SIZE=0):
+        return gpd.read_file(path)
 
 def is_table_like(path: str) -> bool:
     p = path.strip()
