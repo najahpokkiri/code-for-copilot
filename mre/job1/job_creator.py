@@ -131,6 +131,12 @@ def create_databricks_job(
     ]
 
     # Create job
+    email_notifications = (
+        EmailNotifications(on_success=[email], on_failure=[email])
+        if email
+        else None
+    )
+
     job = w.jobs.create(
         name=job_name,
         tasks=tasks,
