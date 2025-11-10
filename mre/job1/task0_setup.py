@@ -25,11 +25,16 @@ Output:
 import os
 import sys
 import json
+import inspect
 import yaml
 from pathlib import Path
 
 # Add current directory to path to import config_builder
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    _SCRIPT_DIR = Path(__file__).resolve().parent
+except NameError:
+    _SCRIPT_DIR = Path(inspect.stack()[0].filename).resolve().parent
+sys.path.insert(0, str(_SCRIPT_DIR))
 from config_builder import ConfigBuilder
 
 # ================================================================================
