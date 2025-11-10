@@ -1,0 +1,58 @@
+# ============================================================================
+# Building Enrichment Pipeline - Job Configuration
+# ============================================================================
+# This is the ONLY file you need to configure to run the pipeline.
+# The master notebook will handle all folder creation, file copying, and job setup.
+
+# ============================================================================
+# COUNTRY
+# ============================================================================
+iso3: "IND"  # ISO 3166-1 alpha-3 country code (e.g., USA, IND, GBR)
+
+# ============================================================================
+# INPUT FILES
+# ============================================================================
+# Provide full DBFS/Workspace paths to your input files
+inputs:
+  # CSV with building type proportions by storey
+  proportions_csv: "/Workspace/Users/npokkiri@munichre.com/inventory_nos_db/data/IND_NOS_storey_mapping_041125.csv"
+
+  # CSV with TSI (Total Sum Insured) multipliers
+  tsi_csv: "/Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/multipliers/tsi.csv"
+
+  # World/Admin boundaries GeoPackage (optional - provide if needed)
+  world_boundaries: "/Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data/inputs/admin/RMS_Admin0_geozones.gpkg"
+
+# ============================================================================
+# DATABRICKS SETTINGS
+# ============================================================================
+databricks:
+  # Catalog and schema for Delta tables
+  catalog: "prp_mr_bdap_projects"
+  schema: "geospatialsolutions"
+
+  # Base workspace path (where your scripts are located)
+  workspace_base: "/Workspace/Users/npokkiri@munichre.com/inventory_nos_db/code-for-copilot-main/mre/job1"
+
+  # Base volume path for data storage
+  volume_base: "/Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data"
+
+  # Cluster ID (leave empty to auto-detect current cluster)
+  cluster_id: ""  # Will auto-detect if empty
+
+# ============================================================================
+# PROCESSING PARAMETERS (Optional - defaults provided)
+# ============================================================================
+params:
+  cell_size: 2000                # Grid cell size in meters
+  download_concurrency: 3        # Parallel download threads
+  max_workers: 8                 # Max parallel workers for processing
+
+# ============================================================================
+# JOB SETTINGS
+# ============================================================================
+job:
+  name: "Building_Enrichment_{ISO3}"  # {ISO3} will be replaced automatically
+  max_concurrent_runs: 1
+  timeout_seconds: 0  # 0 = no timeout
+  email_notifications: "npokkiri@munichre.com"  # Optional: your email for alerts

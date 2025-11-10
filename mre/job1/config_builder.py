@@ -51,15 +51,15 @@ class ConfigBuilder:
 
     def _table_name(self, base_name: str) -> str:
         """
-        Build fully-qualified table name
+        Build fully-qualified table name with ISO3 suffix
 
         Args:
             base_name: Base table name (e.g., 'grid_centroids')
 
         Returns:
-            Fully-qualified table name: catalog.schema.basename
+            Fully-qualified table name: catalog.schema.basename_ISO3
         """
-        return f"{self.catalog}.{self.schema}.{base_name}"
+        return f"{self.catalog}.{self.schema}.{base_name}_{self.iso3}"
 
     def _volume_path(self, *parts: str) -> str:
         """

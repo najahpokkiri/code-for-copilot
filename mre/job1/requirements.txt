@@ -1,0 +1,21 @@
+# ============================================================================
+# Building Enrichment Pipeline - Job Dependencies
+# ============================================================================
+# These packages are required for job cluster execution.
+# They will be automatically installed when the job runs.
+
+# Geospatial processing
+geopandas==0.14.0
+shapely==2.0.2
+rasterio==1.3.9
+
+# Data manipulation
+pandas==2.0.3
+numpy==1.24.3
+pyarrow==13.0.0
+
+# HTTP requests for tile downloads
+requests==2.31.0
+
+# Note: PySpark is pre-installed in Databricks Runtime
+# Note: YAML parsing only needed in notebook, not in job execution
