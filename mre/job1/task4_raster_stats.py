@@ -70,6 +70,7 @@ import time
 import json
 import shutil
 import traceback
+import gzip
 from typing import Optional, Dict, Any, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -407,10 +408,54 @@ def process_tile(tile_id: str,
 # -----------------------------------------------------------------------------
 # Prepare tile clips
 # -----------------------------------------------------------------------------
+def _normalize_path(path: Optional[str]) -> Optional[str]:
+    if path is None:
+        return None
+    if path.startswith("dbfs:"):
+        return path.replace("dbfs:", "/dbfs", 1)
+    return path
+
+def _ensure_uncompressed_geojson(path: str, verbose: bool = False) -> str:
+    """
+    If the path points to a gzip-compressed GeoJSON, decompress it alongside the
+    source file and return the decompressed path. Keeps the decompressed copy so
+    subsequent runs reuse it unless the source changes.
+    """
+    fs_path = _normalize_path(path)
+    if fs_path is None:
+        raise RuntimeError("Admin path is required.")
+
+    if fs_path.lower().endswith(".gz"):
+        target_path = fs_path[:-3]  # drop .gz suffix
+        target_dir = os.path.dirname(target_path)
+        if target_dir:
+            os.makedirs(target_dir, exist_ok=True)
+
+        should_unpack = True
+        if os.path.exists(target_path):
+            try:
+                should_unpack = os.path.getmtime(target_path) < os.path.getmtime(fs_path)
+            except OSError:
+                should_unpack = True
+
+        if should_unpack:
+            if verbose:
+                print(f"Decompressing admin boundary GeoJSON to {target_path}")
+            with gzip.open(fs_path, "rb") as src, open(target_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+        else:
+            if verbose:
+                print(f"Reusing cached admin GeoJSON at {target_path}")
+        return target_path
+
+    return fs_path
+
 def prepare_tile_clips(grid_table: str, spark: SparkSession, admin_path: str, admin_field: str, admin_value: str, tile_footprint_path: str, tile_id_field: str, target_crs: str, verbose: bool) -> Dict[str, Any]:
     if not admin_path or not tile_footprint_path:
         raise RuntimeError("admin_path and tile_footprint_path are required for boundary masking")
-    admin = gpd.read_file(admin_path)
+    admin_path_local = _ensure_uncompressed_geojson(admin_path, verbose=verbose)
+    tile_footprint_local = _normalize_path(tile_footprint_path)
+    admin = gpd.read_file(admin_path_local)
     if admin_field not in admin.columns:
         raise RuntimeError(f"Admin field {admin_field} not in admin columns")
     sel = admin[admin_field] == admin_value
@@ -418,7 +463,7 @@ def prepare_tile_clips(grid_table: str, spark: SparkSession, admin_path: str, ad
     if sel.empty:
         raise RuntimeError(f"No admin rows match {admin_field}={admin_value}")
     union_geom = unary_union(sel.geometry)
-    tiles = gpd.read_file(tile_footprint_path).to_crs(target_crs)
+    tiles = gpd.read_file(tile_footprint_local).to_crs(target_crs)
     grid_tile_ids = spark.read.table(grid_table).select("tile_id").distinct().rdd.map(lambda r: r[0]).collect()
     grid_tile_set = set(grid_tile_ids)
     tile_clip_map: Dict[str, Any] = {}
