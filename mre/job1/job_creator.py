@@ -4,7 +4,8 @@ Creates and configures the Databricks job for the building enrichment pipeline.
 """
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.jobs import Task, TaskDependency, SparkPythonTask, Library
+from databricks.sdk.service.jobs import Task, TaskDependency, SparkPythonTask
+from databricks.sdk.service.compute import Library
 
 
 def create_databricks_job(

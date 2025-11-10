@@ -3,6 +3,8 @@
 ## Overview
 This pipeline processes geospatial building data to generate enriched building inventories with TSI (Total Sum Insured) calculations and export capabilities. Everything runs via a single Jupyter notebook - **no CLI or config files required**.
 
+**NEW**: All input files are in the `data/` folder! Just replace your NOS file and run.
+
 ## Prerequisites
 
 1. **Databricks Workspace** with access to:
@@ -10,11 +12,11 @@ This pipeline processes geospatial building data to generate enriched building i
    - Unity Catalog enabled
    - Volumes for data storage
 
-2. **Input Data Required**:
-   - Proportions CSV (building type distribution by storey)
-   - TSI CSV (Total Sum Insured multipliers)
-   - World/Admin boundaries GeoPackage (optional)
-   - Tile footprint data (included in repo as `ghsl2_0_mwd_l1_tile_schema_land.gpkg`)
+2. **Input Data** (mostly included!):
+   - ✅ TSI CSV (already in `data/tsi.csv`)
+   - ✅ Admin boundaries (already in `data/RMS_Admin0_geozones.json.gz`)
+   - ✅ Tile footprint (already in `data/ghsl2_0_mwd_l1_tile_schema_land.gpkg`)
+   - 📝 **YOU PROVIDE**: Your country-specific NOS storey mapping CSV
 
 3. **Permissions**:
    - Read/write access to specified catalog and schema
@@ -27,47 +29,63 @@ This pipeline processes geospatial building data to generate enriched building i
 
 1. Upload the entire `mre/job1/` folder to your Databricks workspace
 2. Recommended location: `/Workspace/Users/<your-email>/code-for-copilot/mre/job1/`
+3. The `data/` folder contains all input files needed
 
-### Step 2: Open the Notebook
+### Step 2: Replace Your NOS File
+
+**IMPORTANT**: Replace `data/NOS_storey_mapping.csv` with your country-specific file.
+
+**Expected format** (see `data/NOS_storey_mapping_TEMPLATE.csv`):
+```csv
+NOS,P_1,P_2,P_3,P_4,P_5,P_6,P_7,P_8
+1,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+2,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0
+3,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0
+...
+```
+
+Where:
+- `NOS`: Number of stories value
+- `P_1` to `P_8`: Proportions for each storey (must sum to 1.0)
+
+### Step 3: Open the Notebook
 
 Open `create_and_run_job.ipynb` in Databricks and attach it to a cluster (Runtime 13.3+ LTS recommended)
 
-### Step 3: Edit Configuration IN the Notebook
+### Step 4: Edit Configuration IN the Notebook
 
-In **Cell 2** of the notebook, edit these variables:
+In **Cell 2** of the notebook, you only need to edit:
 
 ```python
-# Country code
-ISO3 = "USA"  # Change to your country's ISO3 code
+# Country code (CHANGE THIS for your country)
+ISO3 = "IND"  # Change to your country's ISO3 code
 
-# Databricks settings
+# Databricks settings (if different from defaults)
 CATALOG = "prp_mr_bdap_projects"
 SCHEMA = "geospatialsolutions"
 VOLUME_BASE = "/Volumes/prp_mr_bdap_projects/geospatialsolutions/external/jrc/data"
-
-# Input file paths (full paths)
-PROPORTIONS_CSV = "/Workspace/Users/npokkiri@munichre.com/data/proportions.csv"
-TSI_CSV = "/Volumes/catalog/schema/data/tsi.csv"
-ADMIN_BOUNDARIES = "/Volumes/catalog/schema/data/admin/boundaries.gpkg"
 
 # Workspace path (where these scripts are located)
 WORKSPACE_BASE = "/Workspace/Users/<your-email>/code-for-copilot/mre/job1"
 
 # Optional: Email for notifications
 EMAIL = "your-email@company.com"
-
-# Optional: Cluster ID (leave empty to auto-detect)
-CLUSTER_ID = ""  # Will auto-detect current cluster if empty
 ```
 
-That's it! **No separate config file needed**.
+**That's it!** Input files are automatically read from the `data/` folder:
+```python
+# These are already set in the notebook:
+PROPORTIONS_CSV = f"{WORKSPACE_BASE}/data/NOS_storey_mapping.csv"
+TSI_CSV = f"{WORKSPACE_BASE}/data/tsi.csv"
+ADMIN_BOUNDARIES = f"{WORKSPACE_BASE}/data/RMS_Admin0_geozones.json.gz"
+```
 
-### Step 4: Run All Cells
+### Step 5: Run All Cells
 
 Run all cells in the notebook. It will automatically:
 - ✅ Auto-install required packages (databricks-sdk, pyyaml)
 - ✅ Auto-detect cluster ID
-- ✅ Generate minimal config
+- ✅ Generate minimal config using files from `data/` folder
 - ✅ Create Databricks job with 8 tasks:
   - **Task 0**: Setup (creates folders, copies files, generates full config)
   - **Task 1-7**: Pipeline execution
@@ -75,21 +93,22 @@ Run all cells in the notebook. It will automatically:
 - ✅ Monitor progress in real-time
 - ✅ Verify outputs
 
-### Step 5: What Happens in the Job
+### Step 6: What Happens in the Job
 
 **Task 0 (Setup)** automatically:
 1. Creates `{ISO3}/input/`, `{ISO3}/output/`, `{ISO3}/logs/` folders
-2. Copies tiles to `{ISO3}/input/tiles/`
-3. Copies your CSVs to `{ISO3}/input/`
-4. Uses `config_builder.py` to generate full `config.json` with ISO3 suffixes
-5. Saves config to `{ISO3}/config.json`
+2. Copies tiles from `data/` to `{ISO3}/input/tiles/`
+3. Copies your NOS CSV from `data/` to `{ISO3}/input/`
+4. Copies TSI and admin boundaries from `data/` to `{ISO3}/input/`
+5. Uses `config_builder.py` to generate full `config.json` with ISO3 suffixes
+6. Saves config to `{ISO3}/config.json`
 
 **Task 1-7** (Pipeline):
 - Read `{ISO3}/config.json`
 - Execute the complete pipeline
 - All tables created with `_{ISO3}` suffix
 
-### Step 6: Monitor Progress
+### Step 7: Monitor Progress
 
 The notebook displays real-time job progress:
 
@@ -108,7 +127,7 @@ The notebook displays real-time job progress:
    Duration: 45m 23s
 ```
 
-### Step 7: Access Your Results
+### Step 8: Access Your Results
 
 After successful completion:
 
@@ -135,15 +154,15 @@ After successful completion:
 ## Folder Structure Created (by Task 0)
 
 ```
-{ISO3}/                          # e.g., USA/
+{ISO3}/                          # e.g., IND/
 ├── input/
 │   ├── tiles/
 │   │   ├── ghsl2_0_mwd_l1_tile_schema_land.gpkg
 │   │   ├── built_c/  (created during download)
 │   │   └── smod/     (created during download)
 │   ├── tsi.csv
-│   ├── proportions.csv
-│   └── admin_boundaries.gpkg (optional)
+│   ├── NOS_storey_mapping.csv
+│   └── RMS_Admin0_geozones.json.gz
 ├── output/
 │   └── exports/
 │       └── FULL_{ISO3}/
@@ -159,8 +178,8 @@ After successful completion:
 
 To process multiple countries:
 
-1. In the notebook, change `ISO3 = "USA"` to `ISO3 = "GBR"` (for example)
-2. Update input file paths if different per country
+1. Replace `data/NOS_storey_mapping.csv` with the new country's file
+2. In the notebook, change `ISO3 = "IND"` to `ISO3 = "USA"` (for example)
 3. Re-run all cells
 
 Each country gets its own:
@@ -168,6 +187,19 @@ Each country gets its own:
 - Tables with suffix: `_<ISO3>`
 - Export files: `FULL_{ISO3}/`
 - Config file: `{ISO3}/config.json`
+
+## Test Mode
+
+For quick validation before running the full pipeline:
+
+```python
+# In Cell 2 of the notebook:
+RUN_MODE = "test"  # Processes only 1 tile with 10k grid cells
+```
+
+This allows you to test the complete workflow in ~5 minutes instead of 45+ minutes.
+
+Change to `RUN_MODE = "full"` for production runs.
 
 ## Troubleshooting
 
@@ -178,36 +210,49 @@ If you see import errors:
 2. After restart, re-run all cells from the beginning
 3. Check that your cluster has internet access for PyPI
 
+### Library Import Error
+
+If you see `ImportError: cannot import name 'Library'`:
+- This is fixed in the latest version
+- Make sure you have the updated `job_creator.py` that imports from `databricks.sdk.service.compute`
+
 ### Cluster Not Found
 
 If cluster auto-detection fails:
 1. Get your cluster ID from Databricks UI
 2. In the notebook, set: `CLUSTER_ID = "1234-567890-abcd1234"`
 
-### Table Does Not Exist Error
+### NOS File Format Error
 
-If exports fail with "table does not exist":
-1. Check that all tasks completed successfully (check job logs)
-2. Verify table name includes ISO3 suffix: `building_enrichment_output_{ISO3}`
-3. Check Task 0 logs to ensure config was generated correctly
+If Task 1 fails with proportion errors:
+1. Verify your NOS CSV matches the expected format (see `data/NOS_storey_mapping_TEMPLATE.csv`)
+2. Check that proportions (P_1 to P_8) sum to 1.0 for each NOS value
+3. Ensure column names are exactly: `NOS,P_1,P_2,P_3,P_4,P_5,P_6,P_7,P_8`
+
+### Admin Boundaries File
+
+The pipeline can read `.json.gz` files directly (compressed GeoJSON).
+- GeoPandas reads `RMS_Admin0_geozones.json.gz` without manual decompression
+- No need to extract the `.gz` file
 
 ### File Copy Errors
 
 If Task 0 fails with file copy errors:
-1. Verify source paths exist and are accessible
-2. Check you have read permissions on source paths
-3. Check you have write permissions on volume paths
-4. Ensure paths use correct format:
-   - Workspace: `/Workspace/...`
-   - Volumes: `/Volumes/...`
-   - DBFS: `dbfs:/...`
+1. Verify `data/` folder contains all required files:
+   - `NOS_storey_mapping.csv` (your file)
+   - `tsi.csv`
+   - `RMS_Admin0_geozones.json.gz`
+   - `ghsl2_0_mwd_l1_tile_schema_land.gpkg`
+2. Check workspace path is correct in Cell 2
+3. Verify you have read permissions on workspace files
+4. Check you have write permissions on volume paths
 
 ### Task 0 Failures
 
 If Task 0 (setup) fails:
 1. Check Task 0 logs in Databricks UI
-2. Verify `config_builder.py` exists in workspace
-3. Verify input paths are correct
+2. Verify all files exist in `data/` folder
+3. Verify `config_builder.py` exists in workspace
 4. Check permissions on target volume
 
 ### Job Creation Failures
@@ -216,12 +261,11 @@ If job creation fails:
 1. Verify you have permission to create jobs
 2. Check that the cluster exists and is running
 3. Verify workspace paths are correct
-4. Check that all required files exist in workspace:
-   - `task0_setup.py`
-   - `task1-7.py`
-   - `config_builder.py`
+4. Check that all required files exist:
+   - `data/` folder with input files
+   - `task0_setup.py` through `task7_export.py`
+   - `config_builder.py`, `config_generator.py`, `job_creator.py`, `job_monitor.py`
    - `requirements.txt`
-   - `ghsl2_0_mwd_l1_tile_schema_land.gpkg`
 
 ## Advanced Configuration
 
@@ -258,13 +302,25 @@ The pipeline runs 8 tasks:
 
 All tasks are required for complete execution.
 
+## What's in the data/ Folder
+
+```
+data/
+├── README.md                              # This explains the folder
+├── NOS_storey_mapping.csv                 # ⚠️ YOU MUST PROVIDE THIS
+├── NOS_storey_mapping_TEMPLATE.csv        # Template showing expected format
+├── tsi.csv                                # ✅ Provided
+├── RMS_Admin0_geozones.json.gz           # ✅ Provided (compressed GeoJSON)
+└── ghsl2_0_mwd_l1_tile_schema_land.gpkg  # ✅ Provided
+```
+
 ## Support
 
 For issues or questions:
 1. Check the job logs in Databricks UI (Workflows → Jobs → Building_Enrichment_{ISO3})
 2. Review task-specific error messages (especially Task 0 for setup issues)
-3. Verify all prerequisites are met
-4. Check file paths and permissions in the notebook configuration
+3. Verify your NOS file format matches the template
+4. Check that all files are present in the `data/` folder
 
 ## Next Steps
 
@@ -277,4 +333,4 @@ After successful execution:
 
 ---
 
-**Note**: This pipeline does not require Databricks CLI, Asset Bundles, config files, or command-line tools. Everything runs through the Jupyter notebook interface with configuration directly in the notebook cells.
+**Note**: This pipeline does not require Databricks CLI, Asset Bundles, external config files, or command-line tools. Everything runs through the Jupyter notebook interface with configuration directly in the notebook cells, and all input files come from the `data/` folder.

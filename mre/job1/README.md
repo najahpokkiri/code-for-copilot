@@ -15,9 +15,12 @@ A production-ready geospatial pipeline for processing building inventory data us
 ## Quick Start
 
 1. **Upload** the entire `mre/job1/` folder to your Databricks workspace
-2. **Open** `create_and_run_job.ipynb` in Databricks
-3. **Edit configuration IN Cell 2** (ISO3, paths, catalog/schema) - no external config file needed!
-4. **Run** all cells - the notebook handles everything automatically
+2. **Replace** `data/NOS_storey_mapping.csv` with your country-specific file (tsi.csv and admin boundaries already included!)
+3. **Open** `create_and_run_job.ipynb` in Databricks
+4. **Edit** Cell 2: Change `ISO3` and `WORKSPACE_BASE` (all input files auto-load from `data/` folder)
+5. **Run** all cells - the notebook handles everything automatically
+
+**All input files are in the `data/` folder** - no need to upload them separately!
 
 See [INSTRUCTIONS.md](./INSTRUCTIONS.md) for detailed step-by-step guide.
 
@@ -206,25 +209,26 @@ Tested on Databricks Runtime 13.3 LTS, cluster: 8 cores, 32GB RAM
 Edit these variables directly in the notebook:
 
 ```python
-# Country code
-ISO3 = "USA"
+# Country code (CHANGE THIS)
+ISO3 = "IND"
 
 # Databricks settings
 CATALOG = "your_catalog"
 SCHEMA = "your_schema"
 VOLUME_BASE = "/Volumes/your_catalog/your_schema/data"
 
-# Input file paths
-PROPORTIONS_CSV = "/path/to/proportions.csv"
-TSI_CSV = "/path/to/tsi.csv"
-ADMIN_BOUNDARIES = "/path/to/world.gpkg"
+# Workspace path (CHANGE THIS)
+WORKSPACE_BASE = "/Workspace/Users/your-email/code-for-copilot/mre/job1"
 
-# Workspace path
-WORKSPACE_BASE = "/Workspace/.../mre/job1"
+# Input files (automatically loaded from data/ folder)
+PROPORTIONS_CSV = f"{WORKSPACE_BASE}/data/NOS_storey_mapping.csv"
+TSI_CSV = f"{WORKSPACE_BASE}/data/tsi.csv"
+ADMIN_BOUNDARIES = f"{WORKSPACE_BASE}/data/RMS_Admin0_geozones.json.gz"
 
 # Optional
 EMAIL = "your-email@company.com"
 CLUSTER_ID = ""  # Leave empty to auto-detect
+RUN_MODE = "test"  # or "full"
 ```
 
 ### Advanced Parameters
@@ -240,37 +244,35 @@ TILE_PARALLELISM = 4          # Concurrent tile processing
 
 ## Data Inputs
 
-### Required Inputs
+All input files are in the `data/` folder! Only the NOS file needs to be replaced.
 
-1. **Proportions CSV**
-   - Building type distribution by storey
-   - Columns: `storey_range`, `building_type`, `proportion`
+### Files in data/ Folder
+
+1. **NOS_storey_mapping.csv** (📝 **YOU MUST PROVIDE THIS**)
+   - Your country-specific building storey distribution
+   - Format: `NOS,P_1,P_2,P_3,P_4,P_5,P_6,P_7,P_8`
+   - See `data/NOS_storey_mapping_TEMPLATE.csv` for example
+   - Proportions must sum to 1.0 for each NOS value
    - Example:
      ```csv
-     storey_range,building_type,proportion
-     1,RES,0.60
-     2,RES,0.25
-     3,RES,0.10
-     4-5,RES,0.05
+     NOS,P_1,P_2,P_3,P_4,P_5,P_6,P_7,P_8
+     1,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+     2,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0
+     3,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0
      ```
 
-2. **TSI CSV**
+2. **tsi.csv** (✅ **Provided**)
    - Total Sum Insured multipliers
-   - Columns: `storey_range`, `building_type`, `tsi_multiplier`
-   - Example:
-     ```csv
-     storey_range,building_type,tsi_multiplier
-     1,RES,150000
-     2,RES,300000
-     ```
+   - Already included in the repository
 
-3. **World Boundaries GeoPackage** (Optional)
-   - Country polygons for masking
-   - Must contain ISO3 field matching your country code
+3. **RMS_Admin0_geozones.json.gz** (✅ **Provided**)
+   - Administrative boundaries (compressed GeoJSON)
+   - GeoPandas reads this directly without decompression
+   - Already included in the repository
 
-4. **Tile Footprint GeoPackage** (Included)
-   - GHSL tile schema
-   - File: `ghsl2_0_mwd_l1_tile_schema_land.gpkg`
+4. **ghsl2_0_mwd_l1_tile_schema_land.gpkg** (✅ **Provided**)
+   - GHSL tile footprints
+   - Already included in the repository
 
 ## Data Outputs
 
