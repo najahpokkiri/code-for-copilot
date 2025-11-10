@@ -108,7 +108,7 @@ print("\n📂 Copying input files to {ISO3}/input/...")
 workspace_base = minimal_config.get('workspace_base', '/Workspace/Users/npokkiri@munichre.com/inventory_nos_db/code-for-copilot-main/mre/job1')
 
 # Copy tile footprint
-tile_source = f"{workspace_base}/ghsl2_0_mwd_l1_tile_schema_land.gpkg"
+tile_source = f"{workspace_base}/data/ghsl2_0_mwd_l1_tile_schema_land.gpkg"
 tile_dest = f"{TILES_DIR}/ghsl2_0_mwd_l1_tile_schema_land.gpkg"
 
 try:
