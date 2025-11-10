@@ -5,7 +5,6 @@ Creates and configures the Databricks job for the building enrichment pipeline.
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import Task, TaskDependency, SparkPythonTask
-from databricks.sdk.service.compute import Library
 
 
 def create_databricks_job(
@@ -50,7 +49,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task0_setup.py",
                 parameters=["--minimal_config", minimal_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 1: Proportions to Delta
         Task(
@@ -61,7 +60,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task1_proportions_to_delta.py",
                 parameters=["--config_path", generated_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 2: Grid generation
         Task(
@@ -72,7 +71,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task2_grid_generation.py",
                 parameters=["--config_path", generated_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 3: Tile downloader
         Task(
@@ -83,7 +82,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task3_tile_downloader.py",
                 parameters=["--config_path", generated_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 4: Raster stats
         Task(
@@ -94,7 +93,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task4_raster_stats.py",
                 parameters=["--config_path", generated_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 5: Post processing
         Task(
@@ -105,7 +104,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task5_post_processing.py",
                 parameters=["--config_path", generated_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 6: Create views
         Task(
@@ -116,7 +115,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task6_create_views.py",
                 parameters=["--config_path", generated_config_path]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         ),
         # Task 7: Export
         Task(
@@ -127,7 +126,7 @@ def create_databricks_job(
                 python_file=f"{workspace_base}/task7_export.py",
                 parameters=["--config_path", generated_config_path, "--iso3", iso3]
             ),
-            libraries=[Library(requirements=requirements_path)]
+            libraries=[{"requirements": requirements_path}]
         )
     ]
 
