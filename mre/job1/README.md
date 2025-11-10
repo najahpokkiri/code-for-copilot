@@ -15,8 +15,8 @@ A production-ready geospatial pipeline for processing building inventory data us
 ## Quick Start
 
 1. **Upload** the entire `mre/job1/` folder to your Databricks workspace
-2. **Edit** `job_config.yaml` with your settings (ISO3, paths, catalog/schema)
-3. **Open** `create_and_run_job.ipynb` in Databricks
+2. **Open** `create_and_run_job.ipynb` in Databricks
+3. **Edit configuration IN Cell 2** (ISO3, paths, catalog/schema) - no external config file needed!
 4. **Run** all cells - the notebook handles everything automatically
 
 See [INSTRUCTIONS.md](./INSTRUCTIONS.md) for detailed step-by-step guide.
@@ -27,28 +27,39 @@ See [INSTRUCTIONS.md](./INSTRUCTIONS.md) for detailed step-by-step guide.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  create_and_run_job.ipynb (Master Orchestrator)             │
-│  - Loads job_config.yaml                                     │
-│  - Creates {ISO3}/ folder structure                          │
-│  - Copies input files                                        │
-│  - Generates complete config with ISO3 suffixes              │
-│  - Creates & submits Databricks job                          │
+│  create_and_run_job.ipynb (Notebook)                        │
+│  - User edits config variables in Cell 2                    │
+│  - Generates minimal config                                 │
+│  - Creates Databricks job                                   │
 │  - Monitors progress in real-time                            │
 └─────────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Databricks Job (7 Sequential Tasks)                        │
+│  Databricks Job (8 Sequential Tasks)                        │
+│  Task 0: Setup + config generation                          │
+│  Task 1-7: Pipeline execution                               │
 └─────────────────────────────────────────────────────────────┘
                            │
         ┌──────────────────┼──────────────────┐
         │                  │                  │
         ▼                  ▼                  ▼
-   Task 1-3:          Task 4:            Task 5-7:
-   Data Prep     Raster Processing    Enrichment & Export
+   Task 0:            Task 1-3:          Task 4-7:
+   Setup           Data Prep      Processing & Export
 ```
 
 ### Pipeline Stages
+
+#### Stage 0: Setup & Config Generation (Task 0)
+- **Input**: Minimal config (from notebook)
+- **Process**:
+  - Create `{ISO3}/input/`, `{ISO3}/output/`, `{ISO3}/logs/` folders
+  - Copy tiles to `{ISO3}/input/tiles/`
+  - Copy CSVs to `{ISO3}/input/`
+  - Use `config_builder.py` to generate full config.json with ISO3 suffixes
+  - Save to `{ISO3}/config.json`
+- **Output**: `{ISO3}/config.json` (used by Task 1-7)
+- **Performance**: ~30 seconds
 
 #### Stage 1: Data Ingestion (Task 1)
 - **Input**: Raw CSV files (proportions, TSI multipliers)
@@ -190,33 +201,41 @@ Tested on Databricks Runtime 13.3 LTS, cluster: 8 cores, 32GB RAM
 
 ## Configuration Reference
 
-### Minimal Configuration (`job_config.yaml`)
+### Configuration (in Notebook Cell 2)
 
-```yaml
-iso3: "USA"
+Edit these variables directly in the notebook:
 
-inputs:
-  proportions_csv: "/path/to/proportions.csv"
-  tsi_csv: "/path/to/tsi.csv"
-  world_boundaries: "/path/to/world.gpkg"
+```python
+# Country code
+ISO3 = "USA"
 
-databricks:
-  catalog: "your_catalog"
-  schema: "your_schema"
-  workspace_base: "/Workspace/.../mre/job1"
-  volume_base: "/Volumes/.../data"
-  cluster_id: ""  # Auto-detect
+# Databricks settings
+CATALOG = "your_catalog"
+SCHEMA = "your_schema"
+VOLUME_BASE = "/Volumes/your_catalog/your_schema/data"
+
+# Input file paths
+PROPORTIONS_CSV = "/path/to/proportions.csv"
+TSI_CSV = "/path/to/tsi.csv"
+ADMIN_BOUNDARIES = "/path/to/world.gpkg"
+
+# Workspace path
+WORKSPACE_BASE = "/Workspace/.../mre/job1"
+
+# Optional
+EMAIL = "your-email@company.com"
+CLUSTER_ID = ""  # Leave empty to auto-detect
 ```
 
 ### Advanced Parameters
 
-```yaml
-params:
-  cell_size: 2000                # Grid resolution (meters)
-  download_concurrency: 3        # Parallel tile downloads
-  max_workers: 8                 # Raster processing threads
-  tile_parallelism: 4            # Concurrent tile processing
-  chunk_size: 10000              # Processing batch size
+Edit these in the notebook:
+
+```python
+CELL_SIZE = 2000              # Grid resolution (meters)
+DOWNLOAD_CONCURRENCY = 3      # Parallel tile downloads
+MAX_WORKERS = 8               # Raster processing threads
+TILE_PARALLELISM = 4          # Concurrent tile processing
 ```
 
 ## Data Inputs
@@ -288,11 +307,11 @@ All tables include `_{ISO3}` suffix:
 
 ```
 mre/job1/
-├── create_and_run_job.ipynb         # Master orchestrator notebook
-├── job_config.yaml                   # User configuration file
-├── requirements.txt                  # Python dependencies
-├── config_builder.py                 # Config generation utility
+├── create_and_run_job.ipynb         # Notebook (config IN here, no external file)
+├── requirements.txt                  # Python dependencies (auto-installed)
+├── config_builder.py                 # Config generation (used by Task 0)
 ├── ghsl2_0_mwd_l1_tile_schema_land.gpkg  # Tile footprints
+├── task0_setup.py                    # Setup: folders, files, config generation
 ├── task1_proportions_to_delta.py    # Load proportions to Delta
 ├── task2_grid_generation.py         # Generate grid centroids
 ├── task3_tile_downloader.py         # Download GHSL tiles
@@ -338,7 +357,7 @@ PySpark is pre-installed in Databricks Runtime.
 
 **"Cluster not found"**
 - Cause: Auto-detection failed
-- Fix: Manually specify `cluster_id` in `job_config.yaml`
+- Fix: In notebook Cell 2, set `CLUSTER_ID = "your-cluster-id"`
 
 **"File not found" errors**
 - Cause: Incorrect paths or permissions
@@ -428,15 +447,18 @@ For questions, issues, or feature requests:
 - **Breaking Changes**:
   - Replaced CLI-based workflow with notebook orchestration
   - ISO3 suffix now mandatory for all tables
-  - Simplified configuration (job_config.yaml vs config.yaml)
+  - Configuration IN notebook (no external config file)
+  - Added Task 0 for setup (8 tasks total instead of 7)
 - **New Features**:
   - Auto package installation
   - Real-time job monitoring in notebook
-  - ISO3-first folder organization
+  - ISO3-first folder organization (created by Task 0)
   - Auto-detect cluster ID
+  - Config variables directly in notebook cells
+  - Task 0: Automatic folder creation and config generation
 - **Improvements**:
   - 3x faster raster processing (parallel tile processing)
-  - Reduced configuration complexity (7 required fields vs 50+)
+  - Zero config files to maintain (everything in notebook)
   - Better error handling and logging
   - Comprehensive documentation
 
