@@ -44,6 +44,8 @@ import sys
 import json
 import math
 import traceback
+import tempfile
+import gzip
 from typing import Dict, Any, Optional
 
 import numpy as np
@@ -131,6 +133,35 @@ def resolve_path(path: Optional[str]) -> Optional[str]:
         return path.replace("dbfs:", "/dbfs", 1)
     return path
 
+def read_vector_file(path: str) -> gpd.GeoDataFrame:
+    lower = path.lower()
+    if lower.endswith(".gz"):
+        # Derive an appropriate suffix for the temporary file so that GDAL infers the driver
+        if lower.endswith(".geojson.gz"):
+            suffix = ".geojson"
+        elif lower.endswith(".json.gz"):
+            suffix = ".json"
+        elif lower.endswith(".gpkg.gz"):
+            suffix = ".gpkg"
+        else:
+            suffix = os.path.splitext(path[:-3])[1] or ".tmp"
+        with gzip.open(path, "rb") as gz:
+            data = gz.read()
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(data)
+                tmp.flush()
+                tmp_path = tmp.name
+            return gpd.read_file(tmp_path)
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+    return gpd.read_file(path)
+
 def is_table_like(path: str) -> bool:
     p = path.strip()
     if p.lower().startswith("table:") or p.lower().startswith("delta:"):
@@ -185,8 +216,8 @@ def generate_grids(admin_path: str,
         raise FileNotFoundError(f"Tile footprint file not found: {tile_fp_path_r}")
 
     print("Loading admin and tiles...")
-    admin_full = gpd.read_file(admin_path_r)
-    tiles_full = gpd.read_file(tile_fp_path_r)
+    admin_full = read_vector_file(admin_path_r)
+    tiles_full = read_vector_file(tile_fp_path_r)
 
     admin_field = cfg.get("admin_field", "ISO3")
 
