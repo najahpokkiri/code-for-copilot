@@ -82,6 +82,8 @@ import geopandas as gpd
 from shapely.ops import unary_union
 
 from pyspark.sql import SparkSession
+
+from utils_geospatial import read_vector_file
 # os.environ["CONFIG_PATH"] = "./config.json"
 # -----------------------------------------------------------------------------
 # CLI -> env wrapper (keeps backward compatibility with existing invocation)
@@ -410,7 +412,7 @@ def process_tile(tile_id: str,
 def prepare_tile_clips(grid_table: str, spark: SparkSession, admin_path: str, admin_field: str, admin_value: str, tile_footprint_path: str, tile_id_field: str, target_crs: str, verbose: bool) -> Dict[str, Any]:
     if not admin_path or not tile_footprint_path:
         raise RuntimeError("admin_path and tile_footprint_path are required for boundary masking")
-    admin = gpd.read_file(admin_path)
+    admin = read_vector_file(admin_path, verbose=verbose)
     if admin_field not in admin.columns:
         raise RuntimeError(f"Admin field {admin_field} not in admin columns")
     sel = admin[admin_field] == admin_value
@@ -418,7 +420,7 @@ def prepare_tile_clips(grid_table: str, spark: SparkSession, admin_path: str, ad
     if sel.empty:
         raise RuntimeError(f"No admin rows match {admin_field}={admin_value}")
     union_geom = unary_union(sel.geometry)
-    tiles = gpd.read_file(tile_footprint_path).to_crs(target_crs)
+    tiles = read_vector_file(tile_footprint_path, verbose=verbose).to_crs(target_crs)
     grid_tile_ids = spark.read.table(grid_table).select("tile_id").distinct().rdd.map(lambda r: r[0]).collect()
     grid_tile_set = set(grid_tile_ids)
     tile_clip_map: Dict[str, Any] = {}

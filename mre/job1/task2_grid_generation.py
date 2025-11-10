@@ -44,15 +44,14 @@ import sys
 import json
 import math
 import traceback
-import tempfile
-import gzip
 from typing import Dict, Any, Optional
 
 import numpy as np
 import geopandas as gpd
-import fiona
 from shapely.geometry import Point
 from pyspark.sql import SparkSession
+
+from utils_geospatial import normalize_path, read_vector_file
 
 # os.environ["CONFIG_PATH"] = "./config.json"
 
@@ -127,46 +126,6 @@ def load_config() -> Dict[str, Any]:
         raise RuntimeError(f"Missing required config keys: {missing}")
     return cfg
 
-def resolve_path(path: Optional[str]) -> Optional[str]:
-    if not path:
-        return path
-    if isinstance(path, str) and path.startswith("dbfs:"):
-        return path.replace("dbfs:", "/dbfs", 1)
-    return path
-
-def read_vector_file(path: str) -> gpd.GeoDataFrame:
-    lower = path.lower()
-    if lower.endswith(".gz"):
-        # Derive an appropriate suffix for the temporary file so that GDAL infers the driver
-        if lower.endswith(".geojson.gz"):
-            suffix = ".geojson"
-        elif lower.endswith(".json.gz"):
-            suffix = ".json"
-        elif lower.endswith(".gpkg.gz"):
-            suffix = ".gpkg"
-        else:
-            suffix = os.path.splitext(path[:-3])[1] or ".tmp"
-        with gzip.open(path, "rb") as gz:
-            data = gz.read()
-        tmp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(data)
-                tmp.flush()
-                tmp_path = tmp.name
-            # Allow very large/complex GeoJSON features by removing size limit
-            with fiona.Env(OGR_GEOJSON_MAX_OBJ_SIZE=0):
-                return gpd.read_file(tmp_path)
-        finally:
-            if tmp_path:
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
-    # Allow very large/complex GeoJSON features by removing size limit
-    with fiona.Env(OGR_GEOJSON_MAX_OBJ_SIZE=0):
-        return gpd.read_file(path)
-
 def is_table_like(path: str) -> bool:
     p = path.strip()
     if p.lower().startswith("table:") or p.lower().startswith("delta:"):
@@ -199,7 +158,7 @@ def load_proportions(spark, ppath: str, iso3: str):
         tbl = add_iso_suffix(p, iso3)
         print(f"Reading proportions from table: {tbl}")
         return spark.read.table(tbl)
-    resolved = resolve_path(p)
+    resolved = normalize_path(p)
     print(f"Reading proportions from CSV: {resolved}")
     return spark.read.option("header", True).option("inferSchema", True).csv(resolved)
 
@@ -211,9 +170,9 @@ def generate_grids(admin_path: str,
                    output_csv: str,
                    iso3: str,
                    delta_table: str) -> int:
-    admin_path_r = resolve_path(admin_path)
-    tile_fp_path_r = resolve_path(tile_fp_path)
-    output_csv_r = resolve_path(output_csv)
+    admin_path_r = normalize_path(admin_path)
+    tile_fp_path_r = normalize_path(tile_fp_path)
+    output_csv_r = normalize_path(output_csv)
 
     if not os.path.exists(admin_path_r):
         raise FileNotFoundError(f"Admin file not found: {admin_path_r}")
