@@ -17,5 +17,7 @@ pyarrow==13.0.0
 # HTTP requests for tile downloads
 requests==2.31.0
 
+# Configuration (Task 0 needs YAML to read minimal config)
+pyyaml==6.0.1
+
 # Note: PySpark is pre-installed in Databricks Runtime
-# Note: YAML parsing only needed in notebook, not in job execution
