@@ -628,6 +628,16 @@ def main():
         else:
             tile_ids = [TEST_TILE]
             print(f"Running test for single tile: {TEST_TILE}")
+    else:
+        # Apply max_tiles limit for test mode
+        max_tiles = config.get("max_tiles")
+        run_mode = config.get("run_mode", "full")
+        if max_tiles is not None and max_tiles > 0:
+            tile_ids = tile_ids[:max_tiles]
+            print(f"⚠️  TEST MODE: Limited to {len(tile_ids)} tile(s) (max_tiles={max_tiles})")
+        elif run_mode == "test":
+            tile_ids = tile_ids[:1]
+            print(f"⚠️  TEST MODE: Limited to 1 tile (run_mode=test)")
 
     tile_clip_map: Dict[str, Any] = {}
     if USE_BOUNDARY_MASK:
