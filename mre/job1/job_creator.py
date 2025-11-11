@@ -36,7 +36,8 @@ def create_databricks_job(
     w = WorkspaceClient()
 
     job_name = f"Building_Enrichment_{iso3}"
-    generated_config_path = f"{volume_base}/{iso3}/config.json"
+    # Config is now saved to workspace instead of volume
+    generated_config_path = f"{workspace_base}/config_{iso3}.json"
 
     # Define all 8 tasks
     tasks = [

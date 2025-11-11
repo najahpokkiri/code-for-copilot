@@ -310,9 +310,81 @@ if GENERATE_SUMMARY_EXCEL:
             results[label.upper()] = summarize(subset, btype)
         return results
 
+    # MEMORY FIX: Process in chunks instead of loading entire table into memory
+    print("  📊 Processing data in chunks to avoid memory issues...")
     df_spark = spark.table(INPUT_TABLE)
-    df = df_spark.toPandas()
-    all_results = {b: build_area_tables(df, b) for b in building_types}
+    total_rows = df_spark.count()
+    print(f"  Total rows: {total_rows:,}")
+
+    # Process in chunks to avoid OOM
+    CHUNK_SIZE = 500000  # Process 500k rows at a time
+    num_chunks = (total_rows // CHUNK_SIZE) + 1
+    print(f"  Processing in {num_chunks} chunks of {CHUNK_SIZE:,} rows")
+
+    # Initialize accumulators for each building type
+    accumulators = {}
+    for btype in building_types:
+        accumulators[btype] = {
+            "OVERALL": {col: [0] * len(storey_cols) for col in ["building_pixels", "tsi_values"]},
+            "URBAN": {col: [0] * len(storey_cols) for col in ["building_pixels", "tsi_values"]},
+            "RURAL": {col: [0] * len(storey_cols) for col in ["building_pixels", "tsi_values"]},
+            "SUBURBAN": {col: [0] * len(storey_cols) for col in ["building_pixels", "tsi_values"]},
+        }
+
+    # Process data in chunks
+    for chunk_idx in range(num_chunks):
+        offset = chunk_idx * CHUNK_SIZE
+        print(f"  Processing chunk {chunk_idx + 1}/{num_chunks} (offset={offset:,})")
+
+        # Read chunk
+        chunk_df = df_spark.limit(CHUNK_SIZE).offset(offset).toPandas()
+        if chunk_df.empty:
+            break
+
+        # Add area label
+        chunk_df["area_label"] = chunk_df["urban"].map(area_map).fillna("RURAL")
+
+        # Accumulate counts for each building type
+        for btype in building_types:
+            # Overall
+            for idx, scol in enumerate(storey_cols):
+                accumulators[btype]["OVERALL"]["building_pixels"][idx] += chunk_df[col(scol, btype)].sum()
+                accumulators[btype]["OVERALL"]["tsi_values"][idx] += chunk_df[tsi_col(scol, btype)].sum()
+
+            # By area type
+            for area_label in ["URBAN", "RURAL", "SUBURBAN"]:
+                subset = chunk_df[chunk_df["area_label"] == area_label]
+                if not subset.empty:
+                    for idx, scol in enumerate(storey_cols):
+                        accumulators[btype][area_label]["building_pixels"][idx] += subset[col(scol, btype)].sum()
+                        accumulators[btype][area_label]["tsi_values"][idx] += subset[tsi_col(scol, btype)].sum()
+
+    # Build final summary tables from accumulators
+    print("  Building summary tables...")
+    all_results = {}
+    for btype in building_types:
+        all_results[btype] = {}
+        for area in ["OVERALL", "URBAN", "RURAL", "SUBURBAN"]:
+            acc = accumulators[btype][area]
+            sums = acc["building_pixels"]
+            total = sum(sums)
+            percs = [x / total * 100 if total else 0 for x in sums]
+            sums.append(total)
+            percs.append(100.0)
+
+            tsi_sums = acc["tsi_values"]
+            tsi_total = sum(tsi_sums)
+            tsi_percs = [x / tsi_total * 100 if tsi_total else 0 for x in tsi_sums]
+            tsi_sums.append(tsi_total)
+            tsi_percs.append(100.0)
+
+            data = {
+                "Number of Building Pixels": sums,
+                "Percentage Building Pixels": percs,
+                "Values Sum": tsi_sums,
+                "Values Percentage": tsi_percs,
+            }
+            all_results[btype][area] = pd.DataFrame(data, index=storeys)
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:

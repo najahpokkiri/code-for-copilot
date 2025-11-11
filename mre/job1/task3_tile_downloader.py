@@ -330,6 +330,16 @@ def main():
         raise RuntimeError(f"No tile_ids found in table {GRID_SOURCE}")
     print(f"Found {len(tile_ids)} unique tiles (sample 10): {tile_ids[:10]}")
 
+    # Apply max_tiles limit for test mode
+    max_tiles = cfg.get("max_tiles")
+    run_mode = cfg.get("run_mode", "full")
+    if max_tiles is not None and max_tiles > 0:
+        tile_ids = tile_ids[:max_tiles]
+        print(f"⚠️  TEST MODE: Limited to {len(tile_ids)} tile(s) (max_tiles={max_tiles})")
+    elif run_mode == "test":
+        tile_ids = tile_ids[:1]
+        print(f"⚠️  TEST MODE: Limited to 1 tile (run_mode=test)")
+
     if not DATASETS:
         raise RuntimeError("No datasets requested (provide datasets param, e.g. 'built_c,smod')")
 

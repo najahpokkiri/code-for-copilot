@@ -92,12 +92,12 @@ except:
 print("\n📁 Creating ISO3-based folder structure...")
 
 BASE_DATA_DIR = f"{VOLUME_ROOT}/{ISO3}"
-INPUT_DIR = f"{BASE_DATA_DIR}/input"
-TILES_DIR = f"{INPUT_DIR}/tiles"
+INPUTS_DIR = f"{BASE_DATA_DIR}/inputs"
+TILES_DIR = f"{INPUTS_DIR}/tiles"
 OUTPUT_DIR = f"{BASE_DATA_DIR}/output"
 LOGS_DIR = f"{BASE_DATA_DIR}/logs"
 
-for folder in [BASE_DATA_DIR, INPUT_DIR, TILES_DIR, f"{TILES_DIR}/built_c", f"{TILES_DIR}/smod", OUTPUT_DIR, LOGS_DIR]:
+for folder in [BASE_DATA_DIR, INPUTS_DIR, TILES_DIR, f"{TILES_DIR}/built_c", f"{TILES_DIR}/smod", OUTPUT_DIR, LOGS_DIR]:
     dbutils.fs.mkdirs(folder)
     print(f"  ✓ {folder}")
 
@@ -107,7 +107,7 @@ minimal_config['project']['volume_root'] = BASE_DATA_DIR
 # ================================================================================
 # STEP 3: COPY INPUT FILES
 # ================================================================================
-print("\n📂 Copying input files to {ISO3}/input/...")
+print("\n📂 Copying input files to {ISO3}/inputs/...")
 
 # Get workspace base for tile footprint
 workspace_base = minimal_config.get('workspace_base', '/Workspace/Users/npokkiri@munichre.com/inventory_nos_db/code-for-copilot-main/mre/job1')
@@ -131,7 +131,7 @@ except Exception as e:
 # Copy TSI CSV
 tsi_source = minimal_config['inputs'].get('tsi_csv')
 if tsi_source:
-    tsi_dest = f"{INPUT_DIR}/tsi.csv"
+    tsi_dest = f"{INPUTS_DIR}/tsi.csv"
     try:
         dbutils.fs.cp(tsi_source, tsi_dest, recurse=True)
         print(f"  ✓ TSI: {tsi_source} → {tsi_dest}")
@@ -142,7 +142,7 @@ if tsi_source:
 # Copy Proportions CSV
 prop_source = minimal_config['inputs'].get('proportions_csv')
 if prop_source:
-    prop_dest = f"{INPUT_DIR}/proportions.csv"
+    prop_dest = f"{INPUTS_DIR}/proportions.csv"
     try:
         dbutils.fs.cp(prop_source, prop_dest, recurse=True)
         print(f"  ✓ Proportions: {prop_source} → {prop_dest}")
@@ -153,7 +153,7 @@ if prop_source:
 # Copy admin boundaries (optional)
 admin_source = minimal_config['inputs'].get('admin_boundaries')
 if admin_source and admin_source not in ['', 'None', None]:
-    admin_dest = f"{INPUT_DIR}/admin_boundaries.gpkg"
+    admin_dest = f"{INPUTS_DIR}/admin_boundaries.gpkg"
     try:
         dbutils.fs.cp(admin_source, admin_dest, recurse=True)
         print(f"  ✓ Admin boundaries: {admin_source} → {admin_dest}")
@@ -184,12 +184,14 @@ except Exception as e:
     sys.exit(1)
 
 # ================================================================================
-# STEP 5: SAVE FULL CONFIG TO {ISO3}/config.json
+# STEP 5: SAVE FULL CONFIG TO /workspace/ folder
 # ================================================================================
 print("\n💾 Saving full config.json...")
 
-config_dest = f"{BASE_DATA_DIR}/config.json"
-config_dest_local = config_dest.replace('dbfs:', '/dbfs').replace('/Volumes', '/Volumes')
+# Save to workspace instead of volume mount
+workspace_base = minimal_config.get('workspace_base', '/Workspace/Users/npokkiri@munichre.com/inventory_nos_db/code-for-copilot-main/mre/job1')
+config_dest = f"{workspace_base}/config_{ISO3}.json"
+config_dest_local = config_dest
 
 # Ensure directory exists
 os.makedirs(os.path.dirname(config_dest_local), exist_ok=True)
@@ -200,6 +202,7 @@ with open(config_dest_local, 'w') as f:
 
 print(f"  ✓ Full config saved to: {config_dest}")
 print(f"  ✓ This config will be used by Task 1-7")
+print(f"  ✓ Config is now in /workspace/ folder, not in volume mount")
 
 # ================================================================================
 # SUMMARY
