@@ -84,6 +84,8 @@ class ConfigBuilder:
             # ========== CORE SETTINGS ==========
             "catalog": self.catalog,
             "schema": self.schema,
+            # Execution mode (enables test-mode limits in tasks)
+            "run_mode": self.simple_config.get("run_mode", "full"),
 
             # ========== INPUT FILES ==========
             "proportions_csv_path": self.inputs['proportions_csv'],
@@ -112,8 +114,13 @@ class ConfigBuilder:
             "download_concurrency": self.params['download_concurrency'],
             "download_retries": self.params['download_retries'],
             "spark_tmp_dir": self.params['spark_tmp_dir'],
-            "tile_parallelism": str(self.params['tile_parallelism']),
-            "SAMPLE_SIZE": self.params['sample_size'],
+            # Concurrency and sampling controls
+            "tile_parallelism": self.params['tile_parallelism'],
+            # Keep both for compatibility; tasks currently ignore this
+            "sample_size": self.params.get('sample_size'),
+            "SAMPLE_SIZE": self.params.get('sample_size'),
+            # Optional: cap number of tiles in test mode
+            "max_tiles": self.params.get('max_tiles'),
 
             # ========== TASK 4: RASTER STATS ==========
             "overwrite_schema": self.flags['overwrite_schema'],
