@@ -729,14 +729,25 @@ def main():
     # PROCESS TSI CSV (Simple pass-through)
     # =========================================================================
     tsi_path = resolve_path(cfg["tsi_csv_path"])
-    
+
     print(f"\n{'='*80}")
     print("LOADING TSI CSV")
     print(f"{'='*80}")
     print(f"Path: {tsi_path}")
-    
+
+    # Detect separator and encoding (same as proportions)
+    tsi_separator = detect_separator(tsi_path)
+    tsi_encoding = detect_encoding(tsi_path)
+
+    print(f"Detected separator: '{tsi_separator}'")
+    print(f"Detected encoding: {tsi_encoding}")
+
     try:
-        tsi_df = pd.read_csv(tsi_path)
+        tsi_df = pd.read_csv(
+            tsi_path,
+            sep=tsi_separator,
+            encoding=tsi_encoding
+        )
         print(f"✓ Loaded {len(tsi_df)} rows, {len(tsi_df.columns)} columns")
         
         tsi_spark_df = spark.createDataFrame(tsi_df)
