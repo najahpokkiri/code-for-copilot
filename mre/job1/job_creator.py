@@ -5,6 +5,7 @@ Creates and configures the Databricks job for the building enrichment pipeline.
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.jobs import Task, TaskDependency, SparkPythonTask, JobEmailNotifications
+from datetime import datetime
 
 
 def create_databricks_job(
@@ -35,7 +36,9 @@ def create_databricks_job(
     """
     w = WorkspaceClient()
 
-    job_name = f"Building_Enrichment_{iso3}"
+    # Generate job name with date suffix matching table naming convention
+    date_suffix = datetime.now().strftime("%y%m%d")
+    job_name = f"inv_NoS_{iso3}_{date_suffix}"
     # Config is now saved to workspace instead of volume
     generated_config_path = f"{workspace_base}/config_{iso3}.json"
 
