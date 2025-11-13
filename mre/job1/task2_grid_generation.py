@@ -151,13 +151,13 @@ def load_proportions(spark, ppath: str, iso3: str):
     # handle prefixes
     if p.lower().startswith("table:"):
         tbl = p.split(":",1)[1]
-        tbl = add_iso_suffix(tbl, iso3)
+        # Config builder already includes ISO3 in table name
         print(f"Reading proportions from table: {tbl}")
         return spark.read.table(tbl)
     if is_table_like(p):
-        tbl = add_iso_suffix(p, iso3)
-        print(f"Reading proportions from table: {tbl}")
-        return spark.read.table(tbl)
+        # Config builder already includes ISO3 in table name
+        print(f"Reading proportions from table: {p}")
+        return spark.read.table(p)
     resolved = normalize_path(p)
     print(f"Reading proportions from CSV: {resolved}")
     return spark.read.option("header", True).option("inferSchema", True).csv(resolved)
