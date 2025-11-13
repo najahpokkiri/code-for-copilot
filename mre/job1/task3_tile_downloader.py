@@ -288,7 +288,8 @@ def main():
             return name[:-8] + f"_{iso3}.parquet"
         return f"{name}_{iso3}"
 
-    GRID_SOURCE = add_iso_suffix(cfg["grid_source"])
+    # Config builder already includes ISO3 in table name
+    GRID_SOURCE = cfg["grid_source"]
     # Populate variables
     TILES_DEST_ROOT = cfg["tiles_dest_root"]
     DATASETS = [d.strip() for d in str(cfg.get("datasets", "built_c,smod")).split(",") if d.strip()]

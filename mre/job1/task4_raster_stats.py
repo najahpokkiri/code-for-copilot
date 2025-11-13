@@ -585,11 +585,12 @@ def main():
         return f"{name}_{iso3}"
 
     # Extract config values
-    GRID_SOURCE = add_iso_suffix(config["grid_source"])
+    # Config builder already includes ISO3 in table names
+    GRID_SOURCE = config["grid_source"]
     BUILT_ROOT = config["built_root"]
     SMOD_ROOT = config["smod_root"]
     OUTPUT_DIR = config["output_dir"]
-    COUNTS_DELTA_TABLE = add_iso_suffix(config["counts_delta_table"])
+    COUNTS_DELTA_TABLE = config["counts_delta_table"]
     USE_SMOD = bool(config["use_smod"])
     INCLUDE_NODATA = bool(config["include_nodata"])
     ADD_PERCENTAGES = bool(config["add_percentages"])

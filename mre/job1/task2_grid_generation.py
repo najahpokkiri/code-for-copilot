@@ -290,7 +290,8 @@ if __name__ == "__main__":
     ADMIN_PATH = cfg.get("admin_path")
     TILE_FOOTPRINT_PATH = cfg.get("tile_footprint_path")
     GRID_OUTPUT_CSV = add_iso_suffix(cfg.get("grid_output_csv"), ISO3)
-    DELTA_TABLE = add_iso_suffix(cfg.get("delta_table_base"), ISO3)
+    # Config builder already includes ISO3 in table name
+    DELTA_TABLE = cfg.get("delta_table_base")
     CELL_SIZE = int(cfg.get("cell_size", 5000))
     TARGET_CRS = cfg.get("target_crs", "ESRI:54009")
     EXPORT_CRS = cfg.get("export_crs", "EPSG:4326")
