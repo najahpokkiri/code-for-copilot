@@ -115,7 +115,7 @@ class ConfigBuilder:
             "iso3": self.iso3,
 
             # ========== TASK 2: GRID GENERATION ==========
-            "grid_output_csv": self._volume_path("output", "grid_centroids.csv"),
+            "grid_output_csv": self._volume_path("outputs", "grid_centroids.csv"),
             "delta_table_base": self._table_name("grid_centroids"),
             "cell_size": self.params['cell_size'],
             "export_crs": self.params['export_crs'],

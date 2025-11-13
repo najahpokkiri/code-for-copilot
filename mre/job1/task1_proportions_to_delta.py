@@ -689,7 +689,8 @@ def main():
         prop_spark_df.printSchema()
     
     # Write to Delta
-    proportions_table = add_iso_suffix(cfg.get("proportions_table"), ISO3)
+    # Config builder already includes ISO3 in table name, no need to add suffix
+    proportions_table = cfg.get("proportions_table")
     write_mode = cfg.get("write_mode", "overwrite")
     overwrite_schema = bool(cfg.get("overwrite_schema", True))
     
@@ -755,8 +756,9 @@ def main():
         if cfg.get("preview", True):
             print(f"\nTSI Preview:")
             tsi_spark_df.show(cfg.get('preview_rows', 5), truncate=False)
-        
-        tsi_table = add_iso_suffix(cfg.get("tsi_table"), ISO3)
+
+        # Config builder already includes ISO3 in table name, no need to add suffix
+        tsi_table = cfg.get("tsi_table")
         
         print(f"\nWriting to table: {tsi_table}")
         writer = tsi_spark_df.write.format("delta").mode(write_mode)
