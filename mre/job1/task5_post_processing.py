@@ -23,7 +23,7 @@ Usage:
 
 Output:
 -------
-  - Delta table: {catalog}.{schema}.building_enrichment_output
+  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_output_{YYMMDD}
     Contains storey-level breakdowns by RES/COM/IND with TSI calculations
 
 PROCESSING STEPS:
@@ -557,10 +557,11 @@ def main():
 
     spark = SparkSession.builder.getOrCreate()
 
-    grid_count_table = add_iso_suffix(cfg["grid_count_table"])
-    proportions_table = add_iso_suffix(cfg["proportions_table"])
-    tsi_table = add_iso_suffix(cfg["tsi_table"])
-    output_table = add_iso_suffix(cfg["output_table"])
+    # Table names from config_builder already include ISO3 in new naming convention
+    grid_count_table = cfg["grid_count_table"]
+    proportions_table = cfg["proportions_table"]
+    tsi_table = cfg["tsi_table"]
+    output_table = cfg["output_table"]
     test_tile = cfg.get("test_tile")
     output_dir = cfg.get("output_dir")
     save_temp_csv = bool(cfg.get("save_temp_csv", False))

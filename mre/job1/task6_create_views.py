@@ -84,16 +84,21 @@ def load_config() -> dict:
 cfg = load_config()
 CATALOG = cfg.get("catalog")
 SCHEMA = cfg.get("schema")
-ISO3 = cfg.get("iso3", "IND").strip().lower()
+ISO3 = cfg.get("iso3", "IND").strip().upper()  # Keep uppercase for consistency with naming convention
 
 # Derive table names from config (no hardcoding!)
+# Input table uses new naming convention from config_builder
 BASE_INPUT_TABLE = cfg.get("output_table")
 if not BASE_INPUT_TABLE:
-    # Fallback: construct from catalog/schema
-    BASE_INPUT_TABLE = f"{CATALOG}.{SCHEMA}.building_enrichment_output"
+    # Fallback: construct with new naming convention
+    from datetime import datetime
+    date_suffix = datetime.now().strftime("%y%m%d")
+    BASE_INPUT_TABLE = f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_{date_suffix}"
 
-# Output view base (without LOB suffix)
-BASE_OUTPUT_VIEW = f"{CATALOG}.{SCHEMA}.building_enrichment_tsi_proportions"
+# Output view base (without LOB suffix) - new naming convention with date
+from datetime import datetime
+date_suffix = datetime.now().strftime("%y%m%d")
+BASE_OUTPUT_VIEW = f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_{date_suffix}"
 
 LOBS = ["RES", "COM", "IND"]
 LEVEL_MAPPING = {
@@ -248,8 +253,9 @@ def create_view_for_lob(spark, input_table, output_view_base, cols, lob, iso3):
 def main():
     try:
         iso3 = ISO3  # Already loaded from config
-        input_table = add_iso_suffix(BASE_INPUT_TABLE, iso3)
-        output_view_base = add_iso_suffix(BASE_OUTPUT_VIEW, iso3)
+        # Table names already include ISO3 and date in new naming convention
+        input_table = BASE_INPUT_TABLE
+        output_view_base = BASE_OUTPUT_VIEW
         
         print("="*80)
         print("TASK 6: Create CSV-Compatible TSI Proportion Views")

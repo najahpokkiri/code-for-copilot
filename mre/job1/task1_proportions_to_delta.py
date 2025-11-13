@@ -28,8 +28,8 @@ Or with CLI overrides:
 
 Output:
 -------
-  - Delta table: {catalog}.{schema}.building_enrichment_proportions_input
-  - Delta table: {catalog}.{schema}.building_enrichment_tsi_input
+  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_storey_mapping
+  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_tsi
 
 ROBUST FEATURES:
 ================

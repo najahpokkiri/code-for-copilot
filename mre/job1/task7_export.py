@@ -125,17 +125,23 @@ ISO3 = cfg.get("iso3").upper()
 OUTPUT_DIR = cfg.get("output_dir")
 
 # Derive paths from config (no hardcoding!)
+# Table names use new naming convention from config_builder
 BASE_OUTPUT_TABLE = cfg.get("output_table")
 if not BASE_OUTPUT_TABLE:
-    BASE_OUTPUT_TABLE = f"{CATALOG}.{SCHEMA}.building_enrichment_output_{ISO3.lower()}"
+    from datetime import datetime
+    date_suffix = datetime.now().strftime("%y%m%d")
+    BASE_OUTPUT_TABLE = f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_output_{date_suffix}"
 
-BASE_VIEW_NAME = f"{CATALOG}.{SCHEMA}.building_enrichment_tsi_proportions_{ISO3.lower()}"
+# View base name with new naming convention
+from datetime import datetime
+date_suffix = datetime.now().strftime("%y%m%d")
+BASE_VIEW_NAME = f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_{date_suffix}"
 
-# Export folder: {output_dir}/exports/FULL_{ISO3}
-EXPORT_FOLDER = f"{OUTPUT_DIR}/exports/FULL_{ISO3}"
+# Export folder: {output_dir}/exports/{ISO3}
+EXPORT_FOLDER = f"{OUTPUT_DIR}/exports/{ISO3}"
 
-# Excel summary path
-OUTPUT_PATH = f"{OUTPUT_DIR}/exports/building_summary_country_layout_{ISO3}.xlsx"
+# Excel summary path with new naming convention
+OUTPUT_PATH = f"{OUTPUT_DIR}/exports/inv_NoS_{ISO3}_summary_{date_suffix}.xlsx"
 
 LOBS = ["res", "com", "ind"]
 GENERATE_SUMMARY_EXCEL = True
@@ -254,15 +260,17 @@ print("\n" + "="*80)
 print("EXPORTING FULL DATASETS")
 print("="*80)
 
-main_csv = f"{EXPORT_FOLDER}/building_enrichment_output_{ISO3}_FULL.csv"
+# Main output export with new naming convention
+main_csv = f"{EXPORT_FOLDER}/inv_NoS_{ISO3}_{date_suffix}.csv"
 success = export_full_table_to_csv(BASE_OUTPUT_TABLE, main_csv, "[1/4] Export main output")
 export_results.append(("Main Output", success))
 if success:
     exported_files.append(main_csv)
 
+# View exports with new naming convention
 for idx, lob in enumerate(LOBS, start=2):
-    view_name = f"{BASE_VIEW_NAME}_{lob}_view"
-    view_csv = f"{EXPORT_FOLDER}/building_enrichment_tsi_proportions_{ISO3}_{lob.upper()}_FULL.csv"
+    view_name = f"{BASE_VIEW_NAME}_{lob}"
+    view_csv = f"{EXPORT_FOLDER}/inv_NoS_{ISO3}_TSI_{lob.upper()}_{date_suffix}.csv"
     success = export_full_table_to_csv(view_name, view_csv, f"[{idx}/4] Export {lob.upper()} view")
     export_results.append((f"{lob.upper()} View", success))
     if success:
