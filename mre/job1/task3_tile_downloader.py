@@ -165,6 +165,30 @@ def resolve_path(path: str) -> str:
         return path.replace("dbfs:", "/dbfs", 1)
     return path
 
+def normalize_table_spec(table_spec: str, iso3: str) -> str:
+    """
+    Remove duplicated ISO3 suffixes that can occur when orchestration layers
+    append ISO codes to already-suffixed table names.
+    """
+    if not table_spec or not iso3:
+        return table_spec
+
+    iso_suffix = f"_{iso3.upper()}"
+    parts = table_spec.split(".")
+    table_name = parts[-1]
+
+    if table_name.upper().endswith(iso_suffix):
+        trimmed_table = table_name[:-len(iso_suffix)]
+        # If ISO3 already appears as an infix (e.g. inv_NoS_CRI_grid_centroids),
+        # the trailing suffix is duplicated and should be removed.
+        if f"_{iso3.upper()}_" in trimmed_table.upper():
+            parts[-1] = trimmed_table
+            corrected = ".".join(parts)
+            print(f"⚠️  Detected duplicate ISO3 suffix in grid_source; "
+                  f"using '{corrected}' instead of '{table_spec}'.")
+            return corrected
+    return table_spec
+
 
 # ---------------------------
 # Download helpers
@@ -290,6 +314,7 @@ def main():
 
     # Config builder already includes ISO3 in table name
     GRID_SOURCE = cfg["grid_source"]
+    GRID_SOURCE = normalize_table_spec(GRID_SOURCE, ISO3)
     # Populate variables
     TILES_DEST_ROOT = cfg["tiles_dest_root"]
     DATASETS = [d.strip() for d in str(cfg.get("datasets", "built_c,smod")).split(",") if d.strip()]
