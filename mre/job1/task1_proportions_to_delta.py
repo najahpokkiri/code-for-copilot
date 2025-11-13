@@ -117,7 +117,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "preview": True,
     "preview_rows": 5,
     "auto_normalize_bad_rows": False,  # Set True to force normalization
-    "write_audit": True,
+    "write_audit": False,  # Disabled - audit table not needed in final output
     "sum_tolerance": 0.02  # Allow ±2% deviation from 1.0
 }
 

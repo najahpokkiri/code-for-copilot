@@ -475,6 +475,41 @@ for fpath in exported_files:
     print("  ✓", fpath)
 print("\nAll exports complete, previous versions replaced.")
 
+# ---------------------------------------------------------------------
+# CLEANUP: Remove intermediate/temporary delta tables
+# ---------------------------------------------------------------------
+print("\n" + "="*80)
+print("CLEANUP: Removing intermediate delta tables")
+print("="*80)
+
+from datetime import datetime
+date_suffix = datetime.now().strftime("%y%m%d")
+
+# Tables to drop (intermediate tables not needed in final output)
+intermediate_tables = [
+    f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_grid_centroids",
+    f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_grid_counts",
+    f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_storey_mapping_audit"
+]
+
+for table in intermediate_tables:
+    try:
+        spark.sql(f"DROP TABLE IF EXISTS {table}")
+        print(f"✓ Dropped: {table}")
+    except Exception as e:
+        print(f"⚠️  Could not drop {table}: {e}")
+
+print("\n✅ Cleanup complete - only final tables and views remain")
+print("\nFinal Delta Tables:")
+print(f"  1. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_storey_mapping")
+print(f"  2. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_tsi")
+print(f"  3. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_output_{date_suffix}")
+print("\nFinal Views:")
+print(f"  4. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_RES_{date_suffix}")
+print(f"  5. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_COM_{date_suffix}")
+print(f"  6. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_IND_{date_suffix}")
+print("="*80)
+
 # #!/usr/bin/env python3
 # """
 # Export Building Enrichment FULL Datasets - MOST ROBUST VERSION

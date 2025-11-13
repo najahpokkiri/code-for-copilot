@@ -110,6 +110,7 @@ class ConfigBuilder:
             "proportions_path": self._table_name("storey_mapping"),
             "proportions_table": self._table_name("storey_mapping"),
             "tsi_table": self._table_name("tsi"),
+            "write_audit": self.flags.get('write_audit', False),  # Disabled by default
 
             # ========== COUNTRY SETTINGS ==========
             "iso3": self.iso3,
