@@ -195,6 +195,31 @@ def print_minimal_config(cfg: Dict[str, Any]) -> None:
         print(" TEST_TILE           =", cfg.get("test_tile"))
 
 # -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+def normalize_table_spec(table_spec: str, iso3: str) -> str:
+    """
+    Remove duplicated ISO3 suffixes that can occur when orchestration layers
+    append ISO codes to already-suffixed table names.
+    """
+    if not table_spec or not iso3:
+        return table_spec
+
+    iso_suffix = f"_{iso3.upper()}"
+    parts = table_spec.split(".")
+    table_name = parts[-1]
+
+    if table_name.upper().endswith(iso_suffix):
+        trimmed_table = table_name[:-len(iso_suffix)]
+        if f"_{iso3.upper()}_" in trimmed_table.upper():
+            parts[-1] = trimmed_table
+            corrected = ".".join(parts)
+            print(f"⚠️  Detected duplicate ISO3 suffix in grid_source; "
+                  f"using '{corrected}' instead of '{table_spec}'.")
+            return corrected
+    return table_spec
+
+# -----------------------------------------------------------------------------
 # Constants and helpers
 # -----------------------------------------------------------------------------
 BUILT_CLASSES = np.array([11,12,13,14,15,21,22,23,24,25], dtype=np.uint8)
@@ -585,11 +610,13 @@ def main():
         return f"{name}_{iso3}"
 
     # Extract config values
-    GRID_SOURCE = add_iso_suffix(config["grid_source"])
+    # Config builder already includes ISO3 in table names
+    GRID_SOURCE = config["grid_source"]
+    GRID_SOURCE = normalize_table_spec(GRID_SOURCE, ISO3)
     BUILT_ROOT = config["built_root"]
     SMOD_ROOT = config["smod_root"]
     OUTPUT_DIR = config["output_dir"]
-    COUNTS_DELTA_TABLE = add_iso_suffix(config["counts_delta_table"])
+    COUNTS_DELTA_TABLE = config["counts_delta_table"]
     USE_SMOD = bool(config["use_smod"])
     INCLUDE_NODATA = bool(config["include_nodata"])
     ADD_PERCENTAGES = bool(config["add_percentages"])

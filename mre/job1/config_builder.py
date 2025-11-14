@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 from collections import OrderedDict
+from datetime import datetime
 
 
 class ConfigBuilder:
@@ -49,17 +50,30 @@ class ConfigBuilder:
         self.params = self.simple_config['params']
         self.flags = self.simple_config['flags']
 
-    def _table_name(self, base_name: str) -> str:
+    def _get_date_suffix(self) -> str:
         """
-        Build fully-qualified table name with ISO3 suffix
-
-        Args:
-            base_name: Base table name (e.g., 'grid_centroids')
+        Generate date suffix in YYMMDD format
 
         Returns:
-            Fully-qualified table name: catalog.schema.basename_ISO3
+            Date string in YYMMDD format (e.g., '250113')
         """
-        return f"{self.catalog}.{self.schema}.{base_name}_{self.iso3}"
+        return datetime.now().strftime("%y%m%d")
+
+    def _table_name(self, base_name: str, include_date: bool = False) -> str:
+        """
+        Build fully-qualified table name with new naming convention
+
+        Args:
+            base_name: Base table name (e.g., 'storey_mapping', 'tsi', 'output')
+            include_date: Whether to append date suffix (YYMMDD)
+
+        Returns:
+            Fully-qualified table name: catalog.schema.inv_NoS_ISO3_basename[_YYMMDD]
+        """
+        table_base = f"inv_NoS_{self.iso3}_{base_name}"
+        if include_date:
+            table_base = f"{table_base}_{self._get_date_suffix()}"
+        return f"{self.catalog}.{self.schema}.{table_base}"
 
     def _volume_path(self, *parts: str) -> str:
         """
@@ -93,15 +107,16 @@ class ConfigBuilder:
             "csv_infer_schema": self.flags['csv_infer_schema'],
 
             # ========== TASK 1: DELTA TABLES ==========
-            "proportions_path": self._table_name("building_enrichment_proportions_input"),
-            "proportions_table": self._table_name("building_enrichment_proportions_input"),
-            "tsi_table": self._table_name("building_enrichment_tsi_input"),
+            "proportions_path": self._table_name("storey_mapping"),
+            "proportions_table": self._table_name("storey_mapping"),
+            "tsi_table": self._table_name("tsi"),
+            "write_audit": self.flags.get('write_audit', False),  # Disabled by default
 
             # ========== COUNTRY SETTINGS ==========
             "iso3": self.iso3,
 
             # ========== TASK 2: GRID GENERATION ==========
-            "grid_output_csv": self._volume_path("output", "grid_centroids.csv"),
+            "grid_output_csv": self._volume_path("outputs", "grid_centroids.csv"),
             "delta_table_base": self._table_name("grid_centroids"),
             "cell_size": self.params['cell_size'],
             "export_crs": self.params['export_crs'],
@@ -109,7 +124,6 @@ class ConfigBuilder:
 
             # ========== TASK 3: TILE DOWNLOADER ==========
             "tiles_dest_root": self._volume_path("inputs", "tiles"),
-            "download_status_table": self._table_name("download_status"),
             "datasets": self.params['datasets'],
             "download_concurrency": self.params['download_concurrency'],
             "download_retries": self.params['download_retries'],
@@ -158,7 +172,7 @@ class ConfigBuilder:
 
             # ========== TASK 5: POST-PROCESSING ==========
             "grid_count_table": self._table_name("grid_counts"),
-            "output_table": self._table_name("building_enrichment_output"),
+            "output_table": self._table_name("output", include_date=True),
             "save_temp_csv": self.flags['save_temp_csv'],
         }
 

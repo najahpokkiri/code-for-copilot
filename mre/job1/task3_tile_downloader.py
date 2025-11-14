@@ -13,7 +13,6 @@ All paths are auto-generated from the YAML configuration.
 Required config keys:
   - grid_source: Delta table with grid centroids (contains tile_id column)
   - tiles_dest_root: Root directory for downloaded tiles
-  - download_status_table: Delta table to track download status
   - datasets: Comma-separated datasets to download (e.g., "built_c,smod")
   - download_concurrency: Number of parallel downloads (default: 3)
   - download_retries: Number of retry attempts (default: 2)
@@ -113,13 +112,11 @@ GHSL_CONFIGS = {
 DEFAULT_CONFIG = {
     "grid_source": None,
     "tiles_dest_root": None,
-    "download_status_table": None,
     "datasets": "built_c,smod",
     "download_concurrency": 3,
     "download_retries": 2,
     "dry_run": True,
-    "spark_tmp_dir": "/tmp/job3_grid_tmp",
-    "write_mode": "overwrite"
+    "spark_tmp_dir": "/tmp/job3_grid_tmp"
 }
 
 def _read_json_path(path: str) -> dict:
@@ -157,7 +154,7 @@ def load_config() -> dict:
             else:
                 cfg[k] = val
     # minimal validation
-    missing = [k for k in ("grid_source","tiles_dest_root","download_status_table") if not cfg.get(k)]
+    missing = [k for k in ("grid_source","tiles_dest_root") if not cfg.get(k)]
     if missing:
         raise RuntimeError(f"Missing required config keys: {missing}")
     return cfg
@@ -167,6 +164,30 @@ def resolve_path(path: str) -> str:
     if isinstance(path, str) and path.startswith("dbfs:"):
         return path.replace("dbfs:", "/dbfs", 1)
     return path
+
+def normalize_table_spec(table_spec: str, iso3: str) -> str:
+    """
+    Remove duplicated ISO3 suffixes that can occur when orchestration layers
+    append ISO codes to already-suffixed table names.
+    """
+    if not table_spec or not iso3:
+        return table_spec
+
+    iso_suffix = f"_{iso3.upper()}"
+    parts = table_spec.split(".")
+    table_name = parts[-1]
+
+    if table_name.upper().endswith(iso_suffix):
+        trimmed_table = table_name[:-len(iso_suffix)]
+        # If ISO3 already appears as an infix (e.g. inv_NoS_CRI_grid_centroids),
+        # the trailing suffix is duplicated and should be removed.
+        if f"_{iso3.upper()}_" in trimmed_table.upper():
+            parts[-1] = trimmed_table
+            corrected = ".".join(parts)
+            print(f"⚠️  Detected duplicate ISO3 suffix in grid_source; "
+                  f"using '{corrected}' instead of '{table_spec}'.")
+            return corrected
+    return table_spec
 
 
 # ---------------------------
@@ -291,11 +312,11 @@ def main():
             return name[:-8] + f"_{iso3}.parquet"
         return f"{name}_{iso3}"
 
-    GRID_SOURCE = add_iso_suffix(cfg["grid_source"])
+    # Config builder already includes ISO3 in table name
+    GRID_SOURCE = cfg["grid_source"]
+    GRID_SOURCE = normalize_table_spec(GRID_SOURCE, ISO3)
     # Populate variables
     TILES_DEST_ROOT = cfg["tiles_dest_root"]
-    #DOWNLOAD_STATUS_TABLE = cfg["download_status_table"]
-    DOWNLOAD_STATUS_TABLE = add_iso_suffix(cfg["download_status_table"])
     DATASETS = [d.strip() for d in str(cfg.get("datasets", "built_c,smod")).split(",") if d.strip()]
     DOWNLOAD_CONCURRENCY = int(cfg.get("download_concurrency", 3))
     DOWNLOAD_RETRIES = int(cfg.get("download_retries", 2))
@@ -309,7 +330,6 @@ def main():
     print("JOB PARAMETERS:")
     print(f" GRID_SOURCE            = {GRID_SOURCE}")
     print(f" TILES_DEST_ROOT        = {TILES_DEST_ROOT} -> resolved: {dest_root_local}")
-    print(f" DOWNLOAD_STATUS_TABLE  = {DOWNLOAD_STATUS_TABLE}")
     print(f" DATASETS               = {DATASETS}")
     print(f" DOWNLOAD_CONCURRENCY   = {DOWNLOAD_CONCURRENCY}")
     print(f" DOWNLOAD_RETRIES       = {DOWNLOAD_RETRIES}")
@@ -352,21 +372,9 @@ def main():
     print(f"Starting download step (dry_run={DRY_RUN})")
     statuses = download_tiles(tile_ids, DATASETS, dest_root_local, concurrency=DOWNLOAD_CONCURRENCY, retries=DOWNLOAD_RETRIES, dry_run=DRY_RUN)
 
-    # Write status table to Delta via Spark
-    try:
-        sdf = spark.createDataFrame(pd.DataFrame(statuses))
-        print(f"Writing download status to Delta table: {DOWNLOAD_STATUS_TABLE} (mode={WRITE_MODE})")
-        writer = sdf.write.format("delta").mode(WRITE_MODE)
-        if WRITE_MODE == "overwrite":
-            writer = writer.option("overwriteSchema", "true")
-        writer.saveAsTable(DOWNLOAD_STATUS_TABLE)
-        print("Download status written to Delta successfully.")
-    except Exception as e:
-        tb = traceback.format_exc()
-        raise RuntimeError(f"Failed to write download status to Delta table {DOWNLOAD_STATUS_TABLE}: {e}\n{tb}")
-
+    # Download status tracking removed (no delta table created)
     elapsed = time.time() - start
-    print(f"Download job completed in {elapsed:.1f}s -- {len(statuses)} status rows recorded.")
+    print(f"Download job completed in {elapsed:.1f}s -- {len(statuses)} tiles processed.")
 
 if __name__ == "__main__":
     main()

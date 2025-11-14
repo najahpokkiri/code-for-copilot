@@ -28,8 +28,8 @@ Or with CLI overrides:
 
 Output:
 -------
-  - Delta table: {catalog}.{schema}.building_enrichment_proportions_input
-  - Delta table: {catalog}.{schema}.building_enrichment_tsi_input
+  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_storey_mapping
+  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_tsi
 
 ROBUST FEATURES:
 ================
@@ -117,7 +117,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "preview": True,
     "preview_rows": 5,
     "auto_normalize_bad_rows": False,  # Set True to force normalization
-    "write_audit": True,
+    "write_audit": False,  # Disabled - audit table not needed in final output
     "sum_tolerance": 0.02  # Allow ±2% deviation from 1.0
 }
 
@@ -689,7 +689,8 @@ def main():
         prop_spark_df.printSchema()
     
     # Write to Delta
-    proportions_table = add_iso_suffix(cfg.get("proportions_table"), ISO3)
+    # Config builder already includes ISO3 in table name, no need to add suffix
+    proportions_table = cfg.get("proportions_table")
     write_mode = cfg.get("write_mode", "overwrite")
     overwrite_schema = bool(cfg.get("overwrite_schema", True))
     
@@ -729,14 +730,25 @@ def main():
     # PROCESS TSI CSV (Simple pass-through)
     # =========================================================================
     tsi_path = resolve_path(cfg["tsi_csv_path"])
-    
+
     print(f"\n{'='*80}")
     print("LOADING TSI CSV")
     print(f"{'='*80}")
     print(f"Path: {tsi_path}")
-    
+
+    # Detect separator and encoding (same as proportions)
+    tsi_separator = detect_separator(tsi_path)
+    tsi_encoding = detect_encoding(tsi_path)
+
+    print(f"Detected separator: '{tsi_separator}'")
+    print(f"Detected encoding: {tsi_encoding}")
+
     try:
-        tsi_df = pd.read_csv(tsi_path)
+        tsi_df = pd.read_csv(
+            tsi_path,
+            sep=tsi_separator,
+            encoding=tsi_encoding
+        )
         print(f"✓ Loaded {len(tsi_df)} rows, {len(tsi_df.columns)} columns")
         
         tsi_spark_df = spark.createDataFrame(tsi_df)
@@ -744,8 +756,9 @@ def main():
         if cfg.get("preview", True):
             print(f"\nTSI Preview:")
             tsi_spark_df.show(cfg.get('preview_rows', 5), truncate=False)
-        
-        tsi_table = add_iso_suffix(cfg.get("tsi_table"), ISO3)
+
+        # Config builder already includes ISO3 in table name, no need to add suffix
+        tsi_table = cfg.get("tsi_table")
         
         print(f"\nWriting to table: {tsi_table}")
         writer = tsi_spark_df.write.format("delta").mode(write_mode)
