@@ -17,7 +17,7 @@ Usage:
 
 Output:
 -------
-  - Folder structure: {ISO3}/input/, {ISO3}/output/, {ISO3}/logs/
+  - Folder structure: {ISO3}/input/, {ISO3}/outputs/, {ISO3}/logs/
   - Full config.json at {ISO3}/config.json
   - Copied files in correct locations
 """
@@ -94,7 +94,7 @@ print("\n📁 Creating ISO3-based folder structure...")
 BASE_DATA_DIR = f"{VOLUME_ROOT}/{ISO3}"
 INPUTS_DIR = f"{BASE_DATA_DIR}/inputs"
 TILES_DIR = f"{INPUTS_DIR}/tiles"
-OUTPUT_DIR = f"{BASE_DATA_DIR}/output"
+OUTPUT_DIR = f"{BASE_DATA_DIR}/outputs"
 LOGS_DIR = f"{BASE_DATA_DIR}/logs"
 
 for folder in [BASE_DATA_DIR, INPUTS_DIR, TILES_DIR, f"{TILES_DIR}/built_c", f"{TILES_DIR}/smod", OUTPUT_DIR, LOGS_DIR]:
