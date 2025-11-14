@@ -499,6 +499,68 @@ for table in intermediate_tables:
     except Exception as e:
         print(f"⚠️  Could not drop {table}: {e}")
 
+# ---------------------------------------------------------------------
+# CLEANUP: Remove old timestamped versions of output tables and views
+# ---------------------------------------------------------------------
+print("\n" + "="*80)
+print("CLEANUP: Removing old timestamped tables and views")
+print("="*80)
+
+# Get all tables and views in the schema
+try:
+    tables_df = spark.sql(f"SHOW TABLES IN {CATALOG}.{SCHEMA}")
+    all_objects = [(row['tableName'], row['isTemporary']) for row in tables_df.collect()]
+except Exception as e:
+    print(f"⚠️  Could not list tables/views: {e}")
+    all_objects = []
+
+# Patterns to match old timestamped objects
+output_table_pattern = f"inv_nos_{ISO3.lower()}_output_"
+view_patterns = [
+    f"inv_nos_{ISO3.lower()}_tsi_res_",
+    f"inv_nos_{ISO3.lower()}_tsi_com_",
+    f"inv_nos_{ISO3.lower()}_tsi_ind_"
+]
+
+old_objects = []
+for table_name, is_temp in all_objects:
+    table_lower = table_name.lower()
+
+    # Check if it's an output table with old timestamp
+    if table_lower.startswith(output_table_pattern):
+        # Extract the date suffix (last 6 characters if it's YYMMDD format)
+        if len(table_name) >= 6:
+            suffix = table_name[-6:]
+            # Check if it's a valid date suffix (6 digits) and not today's date
+            if suffix.isdigit() and len(suffix) == 6 and suffix != date_suffix:
+                old_objects.append(table_name)
+                continue
+
+    # Check if it's a view with old timestamp
+    for pattern in view_patterns:
+        if table_lower.startswith(pattern):
+            # Extract the date suffix (last 6 characters)
+            if len(table_name) >= 6:
+                suffix = table_name[-6:]
+                # Check if it's a valid date suffix (6 digits) and not today's date
+                if suffix.isdigit() and len(suffix) == 6 and suffix != date_suffix:
+                    old_objects.append(table_name)
+                    break
+
+# Drop old timestamped objects
+if old_objects:
+    print(f"\nFound {len(old_objects)} old timestamped object(s) to remove:")
+    for obj in old_objects:
+        full_name = f"{CATALOG}.{SCHEMA}.{obj}"
+        try:
+            spark.sql(f"DROP TABLE IF EXISTS {full_name}")
+            spark.sql(f"DROP VIEW IF EXISTS {full_name}")
+            print(f"✓ Dropped: {full_name}")
+        except Exception as e:
+            print(f"⚠️  Could not drop {full_name}: {e}")
+else:
+    print("\n✓ No old timestamped objects found")
+
 print("\n✅ Cleanup complete - only final tables and views remain")
 print("\nFinal Delta Tables:")
 print(f"  1. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_storey_mapping")
