@@ -130,7 +130,7 @@ BASE_OUTPUT_TABLE = cfg.get("output_table")
 if not BASE_OUTPUT_TABLE:
     from datetime import datetime
     date_suffix = datetime.now().strftime("%y%m%d")
-    BASE_OUTPUT_TABLE = f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_output_{date_suffix}"
+    BASE_OUTPUT_TABLE = f"{CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_{date_suffix}"
 
 # View base name with new naming convention
 from datetime import datetime
@@ -515,7 +515,7 @@ except Exception as e:
     all_objects = []
 
 # Patterns to match old timestamped objects
-output_table_pattern = f"inv_nos_{ISO3.lower()}_output_"
+output_table_prefix = f"inv_nos_{ISO3.lower()}_"
 view_patterns = [
     f"inv_nos_{ISO3.lower()}_tsi_res_",
     f"inv_nos_{ISO3.lower()}_tsi_com_",
@@ -527,14 +527,11 @@ for table_name, is_temp in all_objects:
     table_lower = table_name.lower()
 
     # Check if it's an output table with old timestamp
-    if table_lower.startswith(output_table_pattern):
-        # Extract the date suffix (last 6 characters if it's YYMMDD format)
-        if len(table_name) >= 6:
-            suffix = table_name[-6:]
-            # Check if it's a valid date suffix (6 digits) and not today's date
-            if suffix.isdigit() and len(suffix) == 6 and suffix != date_suffix:
-                old_objects.append(table_name)
-                continue
+    if table_lower.startswith(output_table_prefix):
+        suffix = table_lower[len(output_table_prefix):]
+        if suffix.isdigit() and len(suffix) == 6 and suffix != date_suffix:
+            old_objects.append(table_name)
+            continue
 
     # Check if it's a view with old timestamp
     for pattern in view_patterns:
@@ -565,7 +562,7 @@ print("\n✅ Cleanup complete - only final tables and views remain")
 print("\nFinal Delta Tables:")
 print(f"  1. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_storey_mapping")
 print(f"  2. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_tsi")
-print(f"  3. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_output_{date_suffix}")
+print(f"  3. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_{date_suffix}")
 print("\nFinal Views:")
 print(f"  4. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_RES_{date_suffix}")
 print(f"  5. {CATALOG}.{SCHEMA}.inv_NoS_{ISO3}_TSI_COM_{date_suffix}")
