@@ -53,9 +53,9 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
 
-import requests
-import pandas as pd
-from pyspark.sql import SparkSession
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
 
 import requests
 import pandas as pd

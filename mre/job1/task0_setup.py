@@ -26,8 +26,13 @@ import os
 import sys
 import json
 import inspect
-import yaml
 from pathlib import Path
+
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
+import yaml
 
 # Add current directory to path to import config_builder
 try:

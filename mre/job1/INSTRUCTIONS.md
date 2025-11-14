@@ -209,6 +209,10 @@ If you see import errors:
 1. The notebook auto-installs packages and restarts Python
 2. After restart, re-run all cells from the beginning
 3. Check that your cluster has internet access for PyPI
+4. Each job task now double-checks dependencies via `dependency_manager.py`. It
+   installs `requirements.txt` on the attached cluster the first time a task
+   runs (tracked via `/tmp/mre_job1_requirements.sha256`). Delete that file to
+   force a reinstall if you change the requirements.
 
 ### Library Import Error
 

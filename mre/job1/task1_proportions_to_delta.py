@@ -74,6 +74,10 @@ import traceback
 import re
 from typing import Dict, Any, Optional, Tuple
 
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
 import pandas as pd
 import numpy as np
 from pyspark.sql import SparkSession
