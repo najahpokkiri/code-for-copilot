@@ -45,9 +45,14 @@ import os
 import sys
 import json
 import shutil
-import pandas as pd
 from io import BytesIO
 from datetime import datetime
+
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
+import pandas as pd
 from pyspark.sql import SparkSession
 from pyspark.sql.types import NullType
 

@@ -19,6 +19,10 @@ import traceback
 import re
 from typing import Dict, List, Optional
 
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
 from pyspark.sql import SparkSession
 
 # os.environ["CONFIG_PATH"] = "./config.json"
