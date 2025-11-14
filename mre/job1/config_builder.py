@@ -59,18 +59,20 @@ class ConfigBuilder:
         """
         return datetime.now().strftime("%y%m%d")
 
-    def _table_name(self, base_name: str, include_date: bool = False) -> str:
+    def _table_name(self, base_name: Optional[str] = None, include_date: bool = False) -> str:
         """
         Build fully-qualified table name with new naming convention
 
         Args:
-            base_name: Base table name (e.g., 'storey_mapping', 'tsi', 'output')
+            base_name: Optional base table name (e.g., 'storey_mapping', 'tsi')
             include_date: Whether to append date suffix (YYMMDD)
 
         Returns:
-            Fully-qualified table name: catalog.schema.inv_NoS_ISO3_basename[_YYMMDD]
+            Fully-qualified table name: catalog.schema.inv_NoS_ISO3[_basename][_YYMMDD]
         """
-        table_base = f"inv_NoS_{self.iso3}_{base_name}"
+        table_base = f"inv_NoS_{self.iso3}"
+        if base_name:
+            table_base = f"{table_base}_{base_name}"
         if include_date:
             table_base = f"{table_base}_{self._get_date_suffix()}"
         return f"{self.catalog}.{self.schema}.{table_base}"
@@ -172,7 +174,7 @@ class ConfigBuilder:
 
             # ========== TASK 5: POST-PROCESSING ==========
             "grid_count_table": self._table_name("grid_counts"),
-            "output_table": self._table_name("output", include_date=True),
+            "output_table": self._table_name(include_date=True),
             "save_temp_csv": self.flags['save_temp_csv'],
         }
 

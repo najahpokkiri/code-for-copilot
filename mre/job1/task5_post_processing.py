@@ -23,7 +23,7 @@ Usage:
 
 Output:
 -------
-  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_output_{YYMMDD}
+  - Delta table: {catalog}.{schema}.inv_NoS_{ISO3}_{YYMMDD}
     Contains storey-level breakdowns by RES/COM/IND with TSI calculations
 
 PROCESSING STEPS:
