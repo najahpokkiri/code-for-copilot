@@ -65,6 +65,11 @@ import sys
 import json
 import time
 from typing import Dict, Any, List
+
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
 from pyspark.sql import SparkSession, DataFrame, Window
 import pyspark.sql.functions as F
 os.environ["CONFIG_PATH"] = "./config.json"

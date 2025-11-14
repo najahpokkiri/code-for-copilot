@@ -46,6 +46,10 @@ import math
 import traceback
 from typing import Dict, Any, Optional
 
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Point

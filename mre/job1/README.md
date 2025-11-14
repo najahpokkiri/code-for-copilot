@@ -373,6 +373,10 @@ PySpark is pre-installed in Databricks Runtime.
 - Cause: Too many grid cells for cluster size
 - Fix: Scale up cluster or reduce `cell_size` parameter
 
+**Package installation errors**
+- Cause: Existing Databricks clusters ignore per-task `libraries`, so modules like `geopandas` might be missing.
+- Fix: Tasks now call `dependency_manager.ensure_runtime_dependencies()` before importing third-party libs. This runs `pip install -r requirements.txt` once per cluster (tracked via `/tmp/mre_job1_requirements.sha256`). Delete that file to force a reinstall after updating dependencies.
+
 ## Development
 
 ### Testing Individual Tasks

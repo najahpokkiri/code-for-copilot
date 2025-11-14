@@ -73,6 +73,10 @@ import traceback
 from typing import Optional, Dict, Any, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from dependency_manager import ensure_runtime_dependencies
+
+ensure_runtime_dependencies()
+
 import numpy as np
 import pandas as pd
 import rasterio
